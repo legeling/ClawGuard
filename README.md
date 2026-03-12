@@ -22,6 +22,33 @@ Canonical project documents live in `docs/`:
 - Signed YAML and JSON rules packs
 - HTML, PDF, and JSON reporting
 
+## Current Bootstrap Scope
+
+The repository currently ships a Rust workspace with:
+
+- `crates/core-engine`: shared scanning, reporting, and remediation logic
+- `crates/cli`: command-line entry point for scanning and hardening configuration profiles
+
+## CLI Usage
+
+Generate a sample configuration:
+
+```bash
+cargo run -p openclaw-guard -- sample-config --output example.conf
+```
+
+Scan a configuration:
+
+```bash
+cargo run -p openclaw-guard -- scan --config example.conf --format json
+```
+
+Apply hardening to a new output file:
+
+```bash
+cargo run -p openclaw-guard -- harden --config example.conf --output hardened.conf
+```
+
 ## Repository Conventions
 
 - Repository content is English-first.
