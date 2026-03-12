@@ -133,3 +133,32 @@
 - **[Function] Add one-command local auto-discovery and operator flows** (`R6-01`) -> next round
 - **[Security] Add artifact signing and verification workflow** (`R6-02`) -> next round
 - **[Security] Add online trusted rules update workflow** (`R6-03`) -> next round
+
+## Round 6 - 2026-03-12
+
+**PM Score:** 8.8/10  
+**Tests:** 21 passed / 0 failed / 0 skipped  
+**Lint:** 0 errors
+
+### Changes
+
+1. **[Function] Add one-command operator flows** (`R6-01`) ✅
+   - Problem: the product still felt like an engineer-facing toolkit because users had to know when to call `scan`, `scan-profile`, `harden`, or `uninstall`, and where their profile lived.
+   - Change: added `check`, `fix`, and `remove` commands with local auto-discovery, safer defaults, and optional confirmation bypass through `--yes`.
+   - Verification: new CLI tests pass for auto-discovered profile scanning, in-place hardening, and install removal.
+
+2. **[Test] Add auto-discovery CLI regression coverage** (`R6-02`) ✅
+   - Problem: operator-friendly commands are only useful if auto-discovery and defaults stay stable over time.
+   - Change: added CLI integration tests that run from a temp working directory and verify the commands work without explicit paths.
+   - Verification: `cargo test -p clawguard --test cli_flow -- --nocapture` passes with the new checks.
+
+3. **[Operations] Document check, fix, and remove shortcuts** (`R6-03`) ✅
+   - Problem: the new top-level workflow would remain hidden if it only existed in help text.
+   - Change: updated the README and CLI installation guide with the auto-discovery operator shortcuts and their default behavior.
+   - Verification: full workspace tests and lint pass after the docs-aligned command additions.
+
+### Deferred
+
+- **[Security] Add artifact signing and verification workflow** (`R7-01`) -> next round
+- **[Security] Add online trusted rules update workflow** (`R7-02`) -> next round
+- **[Function] Add deeper OpenClaw auto-discovery and network reachability checks** (`R7-03`) -> next round

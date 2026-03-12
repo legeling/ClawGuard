@@ -82,6 +82,7 @@ ClawGuard is currently a working Rust CLI MVP.
 
 Implemented today:
 
+- operator-friendly `check`, `fix`, and `remove` commands
 - CLI scanning
 - CLI hardening
 - CLI uninstall command
@@ -112,6 +113,24 @@ Run help:
 
 ```bash
 cargo run -p clawguard -- help
+```
+
+Auto-discover a local OpenClaw profile and print a readable report:
+
+```bash
+cargo run -p clawguard -- check
+```
+
+Auto-discover a local config and harden it in place:
+
+```bash
+cargo run -p clawguard -- fix --yes
+```
+
+Auto-detect a local install and remove the binary:
+
+```bash
+cargo run -p clawguard -- remove --yes
 ```
 
 Generate a sample config:

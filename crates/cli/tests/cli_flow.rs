@@ -382,3 +382,94 @@ fn rollback_rules_restores_previous_active_version() {
 
     let _ = fs::remove_dir_all(root);
 }
+
+#[test]
+fn check_auto_discovers_profile_and_uses_text_output() {
+    let bin = cli_bin_path();
+    let root = temp_path("check-auto");
+    let logs_dir = root.join("logs");
+
+    fs::create_dir_all(&logs_dir).expect("logs directory should exist");
+    fs::write(
+        root.join("openclaw.conf"),
+        "profile_name=edge\nbind_address=0.0.0.0\nport=18789\ntls_enabled=false\nauth_token=changeme\nsource_allowlist=\nwebhook_enabled=false\nwebhook_public_key=\napproval_preview_consistent=true\ncommand_allowlist_normalized=true\ndebug_enabled=false\nskills_status_exposes_secrets=false\nsuspicious_skills=\ninstaller_origin=official",
+    )
+    .expect("config should be written");
+    fs::write(logs_dir.join("openclaw.log"), "auth_token=super-secret\n")
+        .expect("log file should be written");
+
+    let check = Command::new(&bin)
+        .arg("check")
+        .current_dir(&root)
+        .output()
+        .expect("check should run");
+    assert!(check.status.success());
+
+    let stdout = String::from_utf8(check.stdout).expect("stdout should be utf-8");
+    assert!(stdout.contains("Clawguard Report"));
+    assert!(stdout.contains("Risk Score"));
+    assert!(stdout.contains("Log files contain credential material"));
+
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn fix_auto_discovers_config_and_hardens_in_place() {
+    let bin = cli_bin_path();
+    let root = temp_path("fix-auto");
+    let config_path = root.join("openclaw.conf");
+
+    fs::create_dir_all(&root).expect("temp root should exist");
+    fs::write(
+        &config_path,
+        "profile_name=edge\nbind_address=0.0.0.0\nport=18789\ntls_enabled=true\nauth_token=changeme\nsource_allowlist=\nwebhook_enabled=false\nwebhook_public_key=\napproval_preview_consistent=true\ncommand_allowlist_normalized=true\ndebug_enabled=false\nskills_status_exposes_secrets=false\nsuspicious_skills=\ninstaller_origin=official",
+    )
+    .expect("config should be written");
+
+    let fix = Command::new(&bin)
+        .args(["fix", "--yes"])
+        .current_dir(&root)
+        .output()
+        .expect("fix should run");
+    assert!(fix.status.success());
+
+    let hardened = fs::read_to_string(&config_path).expect("config should remain");
+    assert!(hardened.contains("bind_address=127.0.0.1"));
+    assert!(hardened.contains("source_allowlist=127.0.0.1/32"));
+
+    let backups = fs::read_dir(&root)
+        .expect("root should be readable")
+        .filter_map(Result::ok)
+        .map(|entry| entry.file_name().to_string_lossy().to_string())
+        .filter(|name| name.contains(".bak."))
+        .collect::<Vec<_>>();
+    assert!(!backups.is_empty());
+
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn remove_auto_detects_local_install_dir() {
+    let bin = cli_bin_path();
+    let home = temp_path("remove-auto-home");
+    let install_dir = home.join(".local/bin");
+    fs::create_dir_all(&install_dir).expect("install dir should exist");
+
+    #[cfg(target_os = "windows")]
+    let binary_name = "clawguard.exe";
+    #[cfg(not(target_os = "windows"))]
+    let binary_name = "clawguard";
+
+    let installed_binary = install_dir.join(binary_name);
+    fs::write(&installed_binary, "dummy").expect("installed binary should be written");
+
+    let remove = Command::new(&bin)
+        .args(["remove", "--yes"])
+        .env("HOME", &home)
+        .output()
+        .expect("remove should run");
+    assert!(remove.status.success());
+    assert!(!installed_binary.exists());
+
+    let _ = fs::remove_dir_all(home);
+}

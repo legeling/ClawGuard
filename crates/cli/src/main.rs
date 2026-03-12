@@ -8,6 +8,7 @@ use clawguard_core::{
 };
 use std::env;
 use std::fs;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process;
 
@@ -27,6 +28,9 @@ fn run() -> Result<(), String> {
     };
 
     match command {
+        "check" => run_check(&args[1..]),
+        "fix" => run_fix(&args[1..]),
+        "remove" => run_remove(&args[1..]),
         "scan" => run_scan(&args[1..]),
         "scan-profile" => run_scan_profile(&args[1..]),
         "harden" => run_harden(&args[1..]),
@@ -71,6 +75,38 @@ fn run_scan(args: &[String]) -> Result<(), String> {
     Ok(())
 }
 
+fn run_check(args: &[String]) -> Result<(), String> {
+    let format = optional_flag(args, "--format").unwrap_or_else(|| "text".to_string());
+    let output = optional_flag(args, "--output");
+    let locale = parse_locale(args)?;
+
+    let report = if let Some(config_path) = optional_flag(args, "--config") {
+        let config = load_config(&PathBuf::from(config_path))?;
+        if let Some(rules) = resolve_ruleset_for_scan(args)? {
+            scan_config_with_rules(&config, &rules)
+        } else {
+            scan_config(&config)
+        }
+    } else {
+        let profile_dir = resolve_profile_dir(args)?;
+        if let Some(rules) = resolve_ruleset_for_scan(args)? {
+            scan_profile_with_rules(&profile_dir, &rules)?
+        } else {
+            scan_profile_dir(&profile_dir)?
+        }
+    };
+
+    let rendered = render_report(&report, &format, locale)?;
+    if let Some(path) = output {
+        fs::write(&path, rendered).map_err(|error| format!("failed to write report {path}: {error}"))?;
+        println!("report written to {path}");
+    } else {
+        println!("{rendered}");
+    }
+
+    Ok(())
+}
+
 fn run_scan_profile(args: &[String]) -> Result<(), String> {
     let profile_path = required_flag(args, "--path")?;
     let format = optional_flag(args, "--format").unwrap_or_else(|| "json".to_string());
@@ -90,6 +126,46 @@ fn run_scan_profile(args: &[String]) -> Result<(), String> {
         println!("report written to {path}");
     } else {
         println!("{rendered}");
+    }
+
+    Ok(())
+}
+
+fn run_fix(args: &[String]) -> Result<(), String> {
+    let locale = parse_locale(args)?;
+    let config_path = resolve_config_path(args)?;
+    let output = optional_flag(args, "--output").map(PathBuf::from);
+    let in_place = output.is_none() || args.iter().any(|arg| arg == "--in-place");
+    let assume_yes = args.iter().any(|arg| arg == "--yes");
+
+    if !assume_yes {
+        prompt_for_confirmation(&format!(
+            "Apply hardening to {}{}",
+            config_path.display(),
+            if in_place {
+                " in place with a backup"
+            } else {
+                " and write the result to a separate file"
+            }
+        ))?;
+    }
+
+    let outcome = harden_config_file(&config_path, output.as_deref(), in_place)?;
+    let text = locale_text(locale);
+    println!("{}", text.hardening_completed);
+    println!("{}={}", text.before_score, outcome.before_score);
+    println!("{}={}", text.after_score, outcome.after_score);
+    println!("{}={}", text.output_path, outcome.output_path.display());
+
+    if let Some(backup_path) = outcome.backup_path {
+        println!("{}={}", text.backup_path, backup_path.display());
+    }
+
+    for action in outcome.applied_actions {
+        println!("{}={action}", text.applied);
+    }
+    for action in outcome.manual_actions {
+        println!("{}={action}", text.manual);
     }
 
     Ok(())
@@ -263,6 +339,23 @@ fn run_rules_status(args: &[String]) -> Result<(), String> {
     Ok(())
 }
 
+fn run_remove(args: &[String]) -> Result<(), String> {
+    let locale = parse_locale(args)?;
+    let text = locale_text(locale);
+    let assume_yes = args.iter().any(|arg| arg == "--yes");
+    let install_dir = resolve_install_dir(args)?;
+    let binary_path = install_dir.join(binary_name());
+
+    if !assume_yes {
+        prompt_for_confirmation(&format!("Remove {}", binary_path.display()))?;
+    }
+
+    fs::remove_file(&binary_path)
+        .map_err(|error| format!("failed to remove {}: {error}", binary_path.display()))?;
+    println!("{}={}", text.removed_path, binary_path.display());
+    Ok(())
+}
+
 fn run_uninstall(args: &[String]) -> Result<(), String> {
     let locale = parse_locale(args)?;
     let text = locale_text(locale);
@@ -279,6 +372,37 @@ fn run_uninstall(args: &[String]) -> Result<(), String> {
         .map_err(|error| format!("failed to remove {}: {error}", binary_path.display()))?;
     println!("{}={}", text.removed_path, binary_path.display());
     Ok(())
+}
+
+fn resolve_profile_dir(args: &[String]) -> Result<PathBuf, String> {
+    if let Some(path) = optional_flag(args, "--path") {
+        let profile_dir = PathBuf::from(path);
+        if profile_dir.join("openclaw.conf").exists() {
+            return Ok(profile_dir);
+        }
+
+        return Err(format!(
+            "no openclaw.conf was found under {}",
+            profile_dir.display()
+        ));
+    }
+
+    discover_profile_dir()
+}
+
+fn resolve_config_path(args: &[String]) -> Result<PathBuf, String> {
+    if let Some(path) = optional_flag(args, "--config") {
+        return Ok(PathBuf::from(path));
+    }
+
+    if let Some(path) = optional_flag(args, "--path") {
+        let config_path = PathBuf::from(path).join("openclaw.conf");
+        if config_path.exists() {
+            return Ok(config_path);
+        }
+    }
+
+    Ok(discover_profile_dir()?.join("openclaw.conf"))
 }
 
 fn resolve_ruleset_for_scan(args: &[String]) -> Result<Option<Ruleset>, String> {
@@ -298,6 +422,111 @@ fn resolve_ruleset_for_scan(args: &[String]) -> Result<Option<Ruleset>, String> 
     }
 
     Ok(None)
+}
+
+fn discover_profile_dir() -> Result<PathBuf, String> {
+    for candidate in profile_search_candidates() {
+        if candidate.join("openclaw.conf").exists() {
+            return Ok(candidate);
+        }
+    }
+
+    Err(
+        "could not auto-discover an OpenClaw profile; use --path <dir> or --config <path>"
+            .to_string(),
+    )
+}
+
+fn profile_search_candidates() -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+
+    if let Ok(current_dir) = env::current_dir() {
+        candidates.push(current_dir.clone());
+        candidates.push(current_dir.join("openclaw"));
+        candidates.push(current_dir.join(".openclaw"));
+    }
+
+    if let Some(home) = env::var_os("HOME").map(PathBuf::from) {
+        candidates.push(home.join(".openclaw"));
+        candidates.push(home.join("openclaw"));
+    }
+
+    if let Some(home) = env::var_os("USERPROFILE").map(PathBuf::from) {
+        candidates.push(home.join(".openclaw"));
+        candidates.push(home.join("openclaw"));
+    }
+
+    unique_paths(candidates)
+}
+
+fn resolve_install_dir(args: &[String]) -> Result<PathBuf, String> {
+    if let Some(path) = optional_flag(args, "--install-dir") {
+        let install_dir = PathBuf::from(path);
+        if install_dir.join(binary_name()).exists() {
+            return Ok(install_dir);
+        }
+
+        return Err(format!(
+            "binary not found at {}",
+            install_dir.join(binary_name()).display()
+        ));
+    }
+
+    for candidate in install_search_candidates() {
+        if candidate.join(binary_name()).exists() {
+            return Ok(candidate);
+        }
+    }
+
+    Err("could not auto-detect an installed clawguard binary; use --install-dir <path>".to_string())
+}
+
+fn install_search_candidates() -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+
+    if let Some(path) = env::var_os("CLAWGUARD_INSTALL_DIR").map(PathBuf::from) {
+        candidates.push(path);
+    }
+
+    if let Some(home) = env::var_os("HOME").map(PathBuf::from) {
+        candidates.push(home.join(".local/bin"));
+        candidates.push(home.join(".cargo/bin"));
+    }
+
+    if let Some(home) = env::var_os("USERPROFILE").map(PathBuf::from) {
+        candidates.push(home.join(".local/bin"));
+        candidates.push(home.join(".cargo/bin"));
+    }
+
+    unique_paths(candidates)
+}
+
+fn unique_paths(paths: Vec<PathBuf>) -> Vec<PathBuf> {
+    let mut unique = Vec::new();
+    for path in paths {
+        if !unique.iter().any(|existing| existing == &path) {
+            unique.push(path);
+        }
+    }
+    unique
+}
+
+fn prompt_for_confirmation(prompt: &str) -> Result<(), String> {
+    print!("{prompt}? [y/N] ");
+    io::stdout()
+        .flush()
+        .map_err(|error| format!("failed to flush stdout: {error}"))?;
+
+    let mut input = String::new();
+    io::stdin()
+        .read_line(&mut input)
+        .map_err(|error| format!("failed to read confirmation: {error}"))?;
+
+    if matches!(input.trim().to_ascii_lowercase().as_str(), "y" | "yes") {
+        Ok(())
+    } else {
+        Err("operation cancelled".to_string())
+    }
 }
 
 fn render_report(
@@ -346,6 +575,9 @@ fn print_usage(locale: Locale) {
     println!("ClawGuard CLI");
     println!();
     println!("Commands:");
+    println!("  check [--path <dir> | --config <path>] [--rules <path> | --rules-store <path>] [--format json|html|text] [--locale en|zh-CN] [--output <path>]");
+    println!("  fix [--path <dir> | --config <path>] [--locale en|zh-CN] [--output <path> | --in-place] [--yes]");
+    println!("  remove [--locale en|zh-CN] [--install-dir <path>] [--yes]");
     println!("  scan --config <path> [--rules <path> | --rules-store <path>] [--format json|html|text] [--locale en|zh-CN] [--output <path>]");
     println!("  scan-profile --path <dir> [--rules <path> | --rules-store <path>] [--format json|html|text] [--locale en|zh-CN] [--output <path>]");
     println!("  harden --config <path> [--locale en|zh-CN] (--output <path> | --in-place)");

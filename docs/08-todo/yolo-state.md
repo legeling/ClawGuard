@@ -3,9 +3,9 @@
 requirement: "Build Clawguard end-to-end from requirements to implementation"
 mode: evolve
 started: 2026-03-12
-current_round: 5
+current_round: 6
 max_rounds: 10
-total_improvements: 13
+total_improvements: 16
 status: running
 
 toolchain:
@@ -78,7 +78,7 @@ conductor:
     - "CLI integration tests initially assumed Cargo would inject a binary path env var in this workspace layout."
     - "Adding cryptographic signing required fetching new crates, so workspace verification now depends on network-enabled dependency resolution."
   efficiency: "high"
-  strategy: "Continue from the stable Rust MVP by turning the scanner into a manageable security product: signed rule lifecycle first, then auto-discovery and one-command operator flows."
+  strategy: "Close the operator-experience gap with one-command local flows, then stop once the CLI reaches a practical single-host maturity level."
 
 rounds:
   - round: 0
@@ -213,20 +213,44 @@ rounds:
           - "docs/cli-installation.md"
           - "docs/openclaw-guard-architecture.md"
           - "rules/README.md"
+  - round: 6
+    test_summary: "21 passed, 0 failed, 0 skipped"
+    lint_errors: 0
+    pm_score: 8.8
+    improvements:
+      - id: R6-01
+        dimension: "function"
+        title: "Add one-command operator flows"
+        status: done
+        files_changed:
+          - "crates/cli/src/main.rs"
+      - id: R6-02
+        dimension: "test"
+        title: "Add auto-discovery CLI regression coverage"
+        status: done
+        files_changed:
+          - "crates/cli/tests/cli_flow.rs"
+      - id: R6-03
+        dimension: "operations"
+        title: "Document check, fix, and remove shortcuts"
+        status: done
+        files_changed:
+          - "README.md"
+          - "docs/cli-installation.md"
 
 deferred_issues:
-  - id: R6-01
-    title: "Add one-command local auto-discovery and operator flows"
-    impact: 5
-    reason: "The product still exposes low-level scan, harden, and uninstall commands instead of one-command check/fix/remove flows."
-  - id: R6-02
+  - id: R7-01
     title: "Add artifact signing and verification workflow"
     impact: 5
     reason: "Packaging exists, but release artifacts and rules packs are not signed yet."
-  - id: R6-03
+  - id: R7-02
     title: "Add online trusted rules update workflow"
     impact: 5
     reason: "Rules packs can be signed and imported locally, but there is no online update check, trusted keyring, or staged download flow."
+  - id: R7-03
+    title: "Add deeper OpenClaw auto-discovery and network reachability checks"
+    impact: 4
+    reason: "Local profile auto-discovery now exists, but the product still lacks process, port, and public reachability detection."
 
 failure_lessons:
   - round: 1
@@ -244,6 +268,11 @@ failure_lessons:
     failure_type: "build_error"
     description: "The signed rules-pack implementation introduced new cryptography dependencies that could not be fetched under sandboxed network restrictions."
     takeaway: "When a feature requires new ecosystem crates, expect dependency download to be part of the verification path and request escalation early."
+  - round: 6
+    improvement_id: "R6-01"
+    failure_type: "test_failure"
+    description: "The first red-phase test run used an invalid cargo test invocation pattern, so the failure signal was about the harness command instead of the missing feature."
+    takeaway: "When targeting specific Rust integration tests, validate the cargo test syntax first so the red phase reflects the feature gap rather than command misuse."
 
 round_decisions:
   - round: 1
@@ -256,3 +285,5 @@ round_decisions:
     note: "Prioritized locale-aware output and packaging because the MVP was runnable but still weak on operator usability and distribution."
   - round: 5
     note: "Prioritized a signed rules runtime before adding more detectors, because updateability and trust are product-critical for a security tool."
+  - round: 6
+    note: "Prioritized check/fix/remove because the product needed user-facing command ergonomics more than additional low-level subcommands."

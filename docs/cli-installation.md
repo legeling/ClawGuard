@@ -25,6 +25,18 @@ target/release/clawguard
 cargo run -p clawguard -- help
 ```
 
+Operator-friendly shortcuts:
+
+```bash
+cargo run -p clawguard -- check
+cargo run -p clawguard -- fix --yes
+cargo run -p clawguard -- remove --yes
+```
+
+`check` auto-discovers a local OpenClaw profile and defaults to text output.
+`fix` auto-discovers `openclaw.conf`, hardens it in place by default, and writes a backup first.
+`remove` auto-detects common install directories such as `~/.local/bin` and `~/.cargo/bin`.
+
 ## 3. Install Into Cargo Bin
 
 ```bash
