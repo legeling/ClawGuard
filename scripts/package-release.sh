@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-VERSION="${VERSION:-0.1.0-dev}"
+VERSION="${VERSION:-0.1.2-dev}"
 TARGET_TRIPLE="${TARGET_TRIPLE:-$(rustc -vV | awk '/host:/ {print $2}')}"
 OUTPUT_DIR="${OUTPUT_DIR:-artifacts}"
 PACKAGE_NAME="clawguard-${VERSION}-${TARGET_TRIPLE}"

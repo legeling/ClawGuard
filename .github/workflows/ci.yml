@@ -61,4 +61,4 @@ jobs:
         run: node scripts/test-release-package.js
 
       - name: Build Release Package
-        run: VERSION=0.1.0-ci bash scripts/package-release.sh
+        run: VERSION=0.1.2-ci bash scripts/package-release.sh

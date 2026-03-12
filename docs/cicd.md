@@ -49,7 +49,7 @@ Workflow:
 ## Release Checklist
 
 1. Ensure CI is green
-2. Create and push a tag like `v0.1.0`
+2. Create and push a tag like `v0.1.2`
 3. Confirm `.tar.gz` and `.sig` release artifacts are attached
 4. Confirm the install flows can verify the signed manifest against `keys/release-public.pem`
 5. Confirm npm publish succeeded if npm distribution is desired

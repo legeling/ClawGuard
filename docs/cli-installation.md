@@ -44,7 +44,16 @@ For the default operator experience, run ClawGuard without arguments:
 clawguard
 ```
 
-This starts an interactive menu so users can choose check, fix, remove, or sample-config flows without remembering flags.
+This starts an interactive terminal UI so users can choose check, fix, remove, or sample-config flows without remembering flags.
+
+Interactive behavior in a real TTY:
+
+- arrow keys move through the menu
+- space toggles quick actions
+- enter runs the selected actions
+- confirmations and path prompts use interactive widgets
+
+If ClawGuard is run in a non-interactive shell, it falls back to plain text prompts.
 
 ## 3. Install Into Cargo Bin
 
@@ -90,7 +99,7 @@ Optional environment variables:
 Example:
 
 ```bash
-CLAWGUARD_VERSION=0.1.0 CLAWGUARD_INSTALL_DIR="$HOME/.local/bin" \
+CLAWGUARD_VERSION=0.1.2 CLAWGUARD_INSTALL_DIR="$HOME/.local/bin" \
   curl -fsSL https://raw.githubusercontent.com/legeling/ClawGuard/main/scripts/install-clawguard.sh | bash
 ```
 
@@ -132,7 +141,7 @@ Optional environment variables:
 Example:
 
 ```bash
-VERSION=0.1.0 TARGET_TRIPLE=aarch64-apple-darwin bash scripts/package-release.sh
+VERSION=0.1.2 TARGET_TRIPLE=aarch64-apple-darwin bash scripts/package-release.sh
 ```
 
 ## 7. Signed Rules-Pack Workflow
@@ -148,7 +157,7 @@ Sign the default rules into a versioned pack:
 ```bash
 clawguard sign-rules-pack \
   --output rules-pack.json \
-  --version 0.1.0 \
+  --version 0.1.2 \
   --private-key .keys/clawguard-rules.private.key
 ```
 

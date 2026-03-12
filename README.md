@@ -1,11 +1,24 @@
 # ClawGuard
 
+```text
+  ______ _                 _____                     _
+ / ____| |               / ____|                   | |
+| |    | | __ ___      _| |  __ _   _  __ _ _ __ __| |
+| |    | |/ _` \ \ /\ / / | |_ | | | |/ _` | '__/ _` |
+| |____| | (_| |\ V  V /| |__| | |_| | (_| | | | (_| |
+ \_____|_|\__,_| \_/\_/  \_____|\__,_|\__,_|_|  \__,_|
+```
+
 <p align="center">
   <strong>Harden OpenClaw before the internet finds it.</strong>
 </p>
 
 <p align="center">
   ClawGuard, also known as <strong>小龙虾卫士</strong>, is a CLI-first security scanner and one-click hardening tool for OpenClaw deployments.
+</p>
+
+<p align="center">
+  Current release target: <strong>v0.1.2</strong>
 </p>
 
 <p align="center">
@@ -115,6 +128,20 @@ Run help:
 cargo run -p clawguard -- help
 ```
 
+Start the default interactive operator flow:
+
+```bash
+cargo run -p clawguard --
+```
+
+In a real terminal, ClawGuard now opens a richer TUI:
+
+- emoji-backed action labels
+- arrow-key navigation
+- space-to-toggle quick actions
+- enter-to-run
+- automatic fallback to plain text prompts in non-interactive shells and test runs
+
 Auto-discover a local OpenClaw profile and print a readable report:
 
 ```bash
@@ -123,13 +150,7 @@ cargo run -p clawguard -- check
 
 `check` now prints the discovered `profile_path` and a `local_probe` result before the report body.
 
-Run the interactive operator flow:
-
-```bash
-cargo run -p clawguard --
-```
-
-With no arguments, ClawGuard now starts an interactive menu for check, fix, remove, and sample-config flows.
+With no arguments, ClawGuard starts an interactive menu for check, fix, remove, and sample-config flows.
 
 Auto-discover a local config and harden it in place:
 
@@ -158,7 +179,7 @@ cargo run -p clawguard -- generate-signing-keypair --output-dir .keys
 Sign a rules pack from the default rules or a custom rules file:
 
 ```bash
-cargo run -p clawguard -- sign-rules-pack --output rules-pack.json --version 0.1.0 --private-key .keys/clawguard-rules.private.key
+cargo run -p clawguard -- sign-rules-pack --output rules-pack.json --version 0.1.2 --private-key .keys/clawguard-rules.private.key
 ```
 
 Import and activate the signed rules pack:

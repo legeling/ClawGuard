@@ -6,9 +6,10 @@ use clawguard_core::{
     sample_config, scan_config, scan_config_with_rules, scan_profile_dir, scan_profile_with_rules,
     write_rules_pack, Locale, OpenClawConfig, Ruleset, ScanReport,
 };
+use dialoguer::{theme::ColorfulTheme, Confirm, Input, MultiSelect};
 use std::env;
 use std::fs;
-use std::io::{self, Write};
+use std::io::{self, IsTerminal, Write};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::process;
@@ -341,6 +342,67 @@ fn run_remove(args: &[String]) -> Result<(), String> {
 }
 
 fn run_interactive(locale: Locale) -> Result<(), String> {
+    if supports_rich_interaction() {
+        return run_rich_interactive(locale);
+    }
+
+    run_text_interactive(locale)
+}
+
+fn run_rich_interactive(locale: Locale) -> Result<(), String> {
+    println!("{}", banner());
+    println!();
+    println!("🛡  ClawGuard Interactive Mode");
+    println!("{}", locale_text(locale).tagline);
+    println!("Use ↑/↓ to move, Space to toggle, and Enter to run.");
+    println!();
+
+    loop {
+        let selections = MultiSelect::with_theme(&interactive_theme())
+            .with_prompt("Quick Actions")
+            .items([
+                "🔎 Check this machine",
+                "🛠 Fix local OpenClaw config",
+                "🗑 Remove installed ClawGuard binary",
+                "🧪 Generate sample config here",
+                "🚪 Exit interactive mode",
+            ])
+            .interact()
+            .map_err(|error| format!("interactive menu failed: {error}"))?;
+
+        if selections.is_empty() {
+            if Confirm::with_theme(&interactive_theme())
+                .with_prompt("No action selected. Exit ClawGuard?")
+                .default(true)
+                .interact()
+                .map_err(|error| format!("interactive confirmation failed: {error}"))?
+            {
+                return Ok(());
+            }
+            continue;
+        }
+
+        let exit_after_run = selections.contains(&4);
+        for selection in selections {
+            match selection {
+                0 => interactive_check(locale)?,
+                1 => interactive_fix(locale)?,
+                2 => interactive_remove(locale)?,
+                3 => interactive_sample_config()?,
+                4 => {}
+                _ => {}
+            }
+        }
+
+        if exit_after_run {
+            return Ok(());
+        }
+
+        println!("\nCompleted selected action(s).\n");
+    }
+}
+
+fn run_text_interactive(locale: Locale) -> Result<(), String> {
     println!("{}", banner());
     println!();
     println!("Interactive Mode");
@@ -397,11 +459,11 @@ fn interactive_fix(locale: Locale) -> Result<(), String> {
 fn interactive_remove(locale: Locale) -> Result<(), String> {
     let install_dir = match resolve_install_dir(&[]) {
         Ok(path) => path,
-        Err(_) => match prompt_line(
-            "Enter an install directory, or press Enter to cancel removal",
+        Err(_) => match prompt_optional_input(
+            "Enter an install directory, or leave blank to cancel removal",
         )? {
-            value if value.trim().is_empty() => return Ok(()),
-            value => PathBuf::from(value.trim()),
+            Some(value) => PathBuf::from(value),
+            None => return Ok(()),
         },
     };
 
@@ -409,13 +471,13 @@ fn interactive_remove(locale: Locale) -> Result<(), String> {
 }
 
 fn interactive_sample_config() -> Result<(), String> {
-    let output = match prompt_line(
-        "Enter a config path, or press Enter to create ./openclaw.conf",
+    let output = match prompt_optional_input(
+        "Enter a config path, or leave blank to create ./openclaw.conf",
     )? {
-        value if value.trim().is_empty() => env::current_dir()
+        None => env::current_dir()
             .map_err(|error| format!("failed to resolve current directory: {error}"))?
             .join("openclaw.conf"),
-        value => PathBuf::from(value.trim()),
+        Some(value) => PathBuf::from(value),
     };
 
     fs::write(&output, sample_config())
@@ -612,41 +674,41 @@ fn execute_remove(install_dir: &Path, locale: Locale, assume_yes: bool) -> Resul
 
 fn interactive_target_prompt(operation: &str) -> Result<Option<CheckTarget>, String> {
     println!("No OpenClaw profile was auto-discovered for {operation}.");
-    let input = prompt_line(
-        "Enter a profile directory or config path, type 'sample' to create ./openclaw.conf, or press Enter to cancel",
-    )?;
-    let trimmed = input.trim();
+    if supports_rich_interaction() {
+        let choice = dialoguer::Select::with_theme(&interactive_theme())
+            .with_prompt("How should ClawGuard continue?")
+            .items([
+                "📂 Enter a profile directory or config path",
+                "🧪 Create ./openclaw.conf from the sample template",
+                "↩ Back to the main menu",
+            ])
+            .default(0)
+            .interact()
+            .map_err(|error| format!("interactive selection failed: {error}"))?;
 
-    if trimmed.is_empty() {
-        return Ok(None);
-    }
-
-    if trimmed.eq_ignore_ascii_case("sample") {
-        let config_path = env::current_dir()
-            .map_err(|error| format!("failed to resolve current directory: {error}"))?
-            .join("openclaw.conf");
-        fs::write(&config_path, sample_config()).map_err(|error| {
-            format!(
-                "failed to write sample config {}: {error}",
-                config_path.display()
-            )
-        })?;
-        println!("sample config written to {}", config_path.display());
-        return Ok(Some(CheckTarget::Config(config_path)));
-    }
-
-    let path = PathBuf::from(trimmed);
-    if path.is_dir() {
-        if path.join("openclaw.conf").exists() {
-            Ok(Some(CheckTarget::Profile(path)))
-        } else {
-            Err(format!(
-                "no openclaw.conf was found under {}",
-                path.display()
-            ))
+        match choice {
+            0 => {
+                let path = prompt_required_input("Enter a profile directory or config path")?;
+                parse_interactive_target_path(&path).map(Some)
+            }
+            1 => create_sample_target_here().map(Some),
+            _ => Ok(None),
         }
     } else {
-        Ok(Some(CheckTarget::Config(path)))
+        let input = prompt_line(
+            "Enter a profile directory or config path, type 'sample' to create ./openclaw.conf, or press Enter to cancel",
+        )?;
+        let trimmed = input.trim();
+
+        if trimmed.is_empty() {
+            return Ok(None);
+        }
+
+        if trimmed.eq_ignore_ascii_case("sample") {
+            return create_sample_target_here().map(Some);
+        }
+
+        parse_interactive_target_path(trimmed).map(Some)
     }
 }
 
@@ -817,6 +879,21 @@ fn search_profile_dir(root: &Path, depth: usize) -> Result<Option<PathBuf>, Stri
 }
 
 fn prompt_for_confirmation(prompt: &str) -> Result<(), String> {
+    if supports_rich_interaction() {
+        return Confirm::with_theme(&interactive_theme())
+            .with_prompt(prompt)
+            .default(false)
+            .interact()
+            .map_err(|error| format!("interactive confirmation failed: {error}"))
+            .and_then(|confirmed| {
+                if confirmed {
+                    Ok(())
+                } else {
+                    Err("operation cancelled".to_string())
+                }
+            });
+    }
+
     let input = prompt_line(&format!("{prompt}? [y/N]"))?;
 
     if matches!(input.trim().to_ascii_lowercase().as_str(), "y" | "yes") {
@@ -837,6 +914,99 @@ fn prompt_line(prompt: &str) -> Result<String, String> {
         .read_line(&mut input)
         .map_err(|error| format!("failed to read input: {error}"))?;
     Ok(input)
+}
+
+fn prompt_optional_input(prompt: &str) -> Result<Option<String>, String> {
+    if supports_rich_interaction() {
+        let value = Input::<String>::with_theme(&interactive_theme())
+            .with_prompt(prompt)
+            .allow_empty(true)
+            .interact_text()
+            .map_err(|error| format!("interactive input failed: {error}"))?;
+        let trimmed = value.trim().to_string();
+        if trimmed.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(trimmed))
+        }
+    } else {
+        let value = prompt_line(prompt)?;
+        let trimmed = value.trim().to_string();
+        if trimmed.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(trimmed))
+        }
+    }
+}
+
+fn prompt_required_input(prompt: &str) -> Result<String, String> {
+    if supports_rich_interaction() {
+        Input::<String>::with_theme(&interactive_theme())
+            .with_prompt(prompt)
+            .validate_with(|value: &String| {
+                if value.trim().is_empty() {
+                    Err("Please enter a path.")
+                } else {
+                    Ok(())
+                }
+            })
+            .interact_text()
+            .map(|value| value.trim().to_string())
+            .map_err(|error| format!("interactive input failed: {error}"))
+    } else {
+        let value = prompt_line(prompt)?;
+        let trimmed = value.trim().to_string();
+        if trimmed.is_empty() {
+            Err("operation cancelled".to_string())
+        } else {
+            Ok(trimmed)
+        }
+    }
+}
+
+fn parse_interactive_target_path(input: &str) -> Result<CheckTarget, String> {
+    let path = PathBuf::from(input.trim());
+    if path.is_dir() {
+        if path.join("openclaw.conf").exists() {
+            Ok(CheckTarget::Profile(path))
+        } else {
+            Err(format!(
+                "no openclaw.conf was found under {}",
+                path.display()
+            ))
+        }
+    } else {
+        Ok(CheckTarget::Config(path))
+    }
+}
+
+fn create_sample_target_here() -> Result<CheckTarget, String> {
+    let config_path = env::current_dir()
+        .map_err(|error| format!("failed to resolve current directory: {error}"))?
+        .join("openclaw.conf");
+    fs::write(&config_path, sample_config()).map_err(|error| {
+        format!(
+            "failed to write sample config {}: {error}",
+            config_path.display()
+        )
+    })?;
+    println!("sample config written to {}", config_path.display());
+    Ok(CheckTarget::Config(config_path))
+}
+
+fn interactive_theme() -> ColorfulTheme {
+    ColorfulTheme::default()
+}
+
+fn supports_rich_interaction() -> bool {
+    if matches!(env::var("CLAWGUARD_FORCE_TEXT_UI").as_deref(), Ok("1")) {
+        return false;
+    }
+
+    io::stdin().is_terminal()
+        && io::stdout().is_terminal()
+        && !matches!(env::var("TERM").as_deref(), Ok("dumb"))
 }
 
 fn render_report(

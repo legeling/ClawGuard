@@ -23,7 +23,7 @@ const result = spawnSync("bash", ["scripts/package-release.sh"], {
   cwd: repoRoot,
   env: {
     ...process.env,
-    VERSION: "0.0.0-test",
+    VERSION: "0.1.2-test",
     TARGET_TRIPLE: "x86_64-unknown-linux-gnu",
     OUTPUT_DIR: outputDir,
     CLAWGUARD_SKIP_BUILD: "1",
@@ -36,7 +36,7 @@ const result = spawnSync("bash", ["scripts/package-release.sh"], {
 
 assert.equal(result.status, 0, result.stderr || result.stdout);
 
-const packageName = "clawguard-0.0.0-test-x86_64-unknown-linux-gnu";
+const packageName = "clawguard-0.1.2-test-x86_64-unknown-linux-gnu";
 const manifestPath = join(outputDir, `${packageName}.sig`);
 const manifestText = readFileSync(manifestPath, "utf8");
 assert.match(manifestText, /sha256=/);
