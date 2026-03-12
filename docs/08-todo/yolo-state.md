@@ -3,10 +3,10 @@
 requirement: "Build Clawguard end-to-end from requirements to implementation"
 mode: evolve
 started: 2026-03-12
-current_round: 6
+current_round: 7
 max_rounds: 10
-total_improvements: 16
-status: running
+total_improvements: 19
+status: done
 
 toolchain:
   language: "rust,node"
@@ -78,7 +78,7 @@ conductor:
     - "CLI integration tests initially assumed Cargo would inject a binary path env var in this workspace layout."
     - "Adding cryptographic signing required fetching new crates, so workspace verification now depends on network-enabled dependency resolution."
   efficiency: "high"
-  strategy: "Close the operator-experience gap with one-command local flows, then stop once the CLI reaches a practical single-host maturity level."
+  strategy: "Stop after the CLI reaches a practical single-host operator baseline: auto-discovery, one-command flows, signed rules lifecycle, and basic live reachability hints."
 
 rounds:
   - round: 0
@@ -237,17 +237,43 @@ rounds:
         files_changed:
           - "README.md"
           - "docs/cli-installation.md"
+  - round: 7
+    test_summary: "23 passed, 0 failed, 0 skipped"
+    lint_errors: 0
+    pm_score: 9.0
+    improvements:
+      - id: R7-01
+        dimension: "function"
+        title: "Add recursive profile discovery"
+        status: done
+        files_changed:
+          - "crates/cli/src/main.rs"
+          - "crates/cli/tests/cli_flow.rs"
+      - id: R7-02
+        dimension: "function"
+        title: "Add local reachability probe to check output"
+        status: done
+        files_changed:
+          - "crates/cli/src/main.rs"
+          - "crates/cli/tests/cli_flow.rs"
+      - id: R7-03
+        dimension: "operations"
+        title: "Document discovered path and probe output"
+        status: done
+        files_changed:
+          - "README.md"
+          - "docs/cli-installation.md"
 
 deferred_issues:
-  - id: R7-01
+  - id: R8-01
     title: "Add artifact signing and verification workflow"
     impact: 5
     reason: "Packaging exists, but release artifacts and rules packs are not signed yet."
-  - id: R7-02
+  - id: R8-02
     title: "Add online trusted rules update workflow"
     impact: 5
     reason: "Rules packs can be signed and imported locally, but there is no online update check, trusted keyring, or staged download flow."
-  - id: R7-03
+  - id: R8-03
     title: "Add deeper OpenClaw auto-discovery and network reachability checks"
     impact: 4
     reason: "Local profile auto-discovery now exists, but the product still lacks process, port, and public reachability detection."
@@ -273,6 +299,11 @@ failure_lessons:
     failure_type: "test_failure"
     description: "The first red-phase test run used an invalid cargo test invocation pattern, so the failure signal was about the harness command instead of the missing feature."
     takeaway: "When targeting specific Rust integration tests, validate the cargo test syntax first so the red phase reflects the feature gap rather than command misuse."
+  - round: 7
+    improvement_id: "R7-02"
+    failure_type: "test_environment"
+    description: "The sandbox does not permit binding a test TCP listener, so a positive probe test could not rely on a real local socket."
+    takeaway: "Keep the production probe real, but let tests override probe results through a dedicated environment hook when sandbox networking is restricted."
 
 round_decisions:
   - round: 1
@@ -287,3 +318,5 @@ round_decisions:
     note: "Prioritized a signed rules runtime before adding more detectors, because updateability and trust are product-critical for a security tool."
   - round: 6
     note: "Prioritized check/fix/remove because the product needed user-facing command ergonomics more than additional low-level subcommands."
+  - round: 7
+    note: "Stopped after recursive discovery and local probe reporting because the CLI now satisfies the single-host operator workflow that drove this iteration."

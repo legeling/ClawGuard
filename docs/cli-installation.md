@@ -34,6 +34,7 @@ cargo run -p clawguard -- remove --yes
 ```
 
 `check` auto-discovers a local OpenClaw profile and defaults to text output.
+It also prints the discovered `profile_path` and a `local_probe` result before the report body.
 `fix` auto-discovers `openclaw.conf`, hardens it in place by default, and writes a backup first.
 `remove` auto-detects common install directories such as `~/.local/bin` and `~/.cargo/bin`.
 

@@ -121,6 +121,8 @@ Auto-discover a local OpenClaw profile and print a readable report:
 cargo run -p clawguard -- check
 ```
 
+`check` now prints the discovered `profile_path` and a `local_probe` result before the report body.
+
 Auto-discover a local config and harden it in place:
 
 ```bash

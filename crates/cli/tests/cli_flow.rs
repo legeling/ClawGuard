@@ -473,3 +473,58 @@ fn remove_auto_detects_local_install_dir() {
 
     let _ = fs::remove_dir_all(home);
 }
+
+#[test]
+fn check_recursively_discovers_profile_under_current_workspace() {
+    let bin = cli_bin_path();
+    let root = temp_path("check-recursive");
+    let nested_profile = root.join("workspace/projects/demo");
+    fs::create_dir_all(&nested_profile).expect("nested profile should exist");
+    fs::write(
+        nested_profile.join("openclaw.conf"),
+        "profile_name=recursive\nbind_address=127.0.0.1\nport=18789\ntls_enabled=true\nauth_token=abcdefghijklmnopqrstuvwxyz\nsource_allowlist=127.0.0.1/32\nwebhook_enabled=false\nwebhook_public_key=\napproval_preview_consistent=true\ncommand_allowlist_normalized=true\ndebug_enabled=false\nskills_status_exposes_secrets=false\nsuspicious_skills=\ninstaller_origin=official",
+    )
+    .expect("config should be written");
+
+    let check = Command::new(&bin)
+        .arg("check")
+        .current_dir(&root)
+        .output()
+        .expect("check should run");
+    assert!(check.status.success());
+
+    let stdout = String::from_utf8(check.stdout).expect("stdout should be utf-8");
+    assert!(stdout.contains("profile_path="));
+    assert!(stdout.contains("workspace/projects/demo"));
+
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn check_reports_local_probe_when_service_is_reachable() {
+    let bin = cli_bin_path();
+    let root = temp_path("check-probe");
+    let port = 18789;
+
+    fs::create_dir_all(&root).expect("temp root should exist");
+    fs::write(
+        root.join("openclaw.conf"),
+        format!(
+            "profile_name=probe\nbind_address=127.0.0.1\nport={port}\ntls_enabled=true\nauth_token=abcdefghijklmnopqrstuvwxyz\nsource_allowlist=127.0.0.1/32\nwebhook_enabled=false\nwebhook_public_key=\napproval_preview_consistent=true\ncommand_allowlist_normalized=true\ndebug_enabled=false\nskills_status_exposes_secrets=false\nsuspicious_skills=\ninstaller_origin=official"
+        ),
+    )
+    .expect("config should be written");
+
+    let check = Command::new(&bin)
+        .arg("check")
+        .env("CLAWGUARD_TEST_PROBE_RESULT", "reachable")
+        .current_dir(&root)
+        .output()
+        .expect("check should run");
+    assert!(check.status.success());
+
+    let stdout = String::from_utf8(check.stdout).expect("stdout should be utf-8");
+    assert!(stdout.contains("local_probe=reachable"));
+
+    let _ = fs::remove_dir_all(root);
+}

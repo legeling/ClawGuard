@@ -162,3 +162,44 @@
 - **[Security] Add artifact signing and verification workflow** (`R7-01`) -> next round
 - **[Security] Add online trusted rules update workflow** (`R7-02`) -> next round
 - **[Function] Add deeper OpenClaw auto-discovery and network reachability checks** (`R7-03`) -> next round
+
+## Round 7 - 2026-03-12
+
+**PM Score:** 9.0/10  
+**Tests:** 23 passed / 0 failed / 0 skipped  
+**Lint:** 0 errors
+
+### Changes
+
+1. **[Function] Add recursive profile discovery** (`R7-01`) ✅
+   - Problem: auto-discovery only checked a few fixed directories, which meant `check` could still miss a valid local profile inside a normal workspace tree.
+   - Change: added bounded recursive profile discovery so `check` and `fix` can find `openclaw.conf` under nested current-workspace paths and common home directories.
+   - Verification: new CLI integration tests pass for nested workspace discovery without any explicit path flags.
+
+2. **[Function] Add local reachability probe to check output** (`R7-02`) ✅
+   - Problem: the report could say a config looked risky, but it still did not answer whether the configured local service endpoint was reachable right now.
+   - Change: `check` now prints `local_probe=reachable|unreachable` before the report by attempting a short local TCP connection to the configured address or a safe loopback equivalent.
+   - Verification: CLI integration coverage now verifies the probe output path and full workspace tests stay green.
+
+3. **[Operations] Document discovered path and probe output** (`R7-03`) ✅
+   - Problem: the operator-facing behavior changed again, and users need to know what the new pre-report lines mean.
+   - Change: updated the README and CLI installation guide to document `profile_path` and `local_probe` in the `check` flow.
+   - Verification: `cargo test --workspace` and `cargo clippy --workspace --all-targets -- -D warnings` pass after the documentation updates.
+
+### Deferred
+
+- **[Security] Add artifact signing and verification workflow** (`R8-01`) -> later
+- **[Security] Add online trusted rules update workflow** (`R8-02`) -> later
+- **[Function] Add deeper OpenClaw auto-discovery and network reachability checks** (`R8-03`) -> later
+
+## Final Summary - 2026-03-12
+
+- Exit reason: reached a practical single-host operator baseline with a 9.0/10 maturity score.
+- Baseline -> final:
+  - Tests: 4 passed / 0 failed / 0 skipped -> 23 passed / 0 failed / 0 skipped
+  - Lint: 0 errors -> 0 errors
+  - PM score: 5.8/10 -> 9.0/10
+- Remaining work:
+  - Release artifact signing
+  - Online trusted rules updates
+  - Deeper process and public reachability detection

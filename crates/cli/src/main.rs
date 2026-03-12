@@ -9,8 +9,10 @@ use clawguard_core::{
 use std::env;
 use std::fs;
 use std::io::{self, Write};
+use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::process;
+use std::time::Duration;
 
 fn main() {
     if let Err(error) = run() {
@@ -79,21 +81,25 @@ fn run_check(args: &[String]) -> Result<(), String> {
     let format = optional_flag(args, "--format").unwrap_or_else(|| "text".to_string());
     let output = optional_flag(args, "--output");
     let locale = parse_locale(args)?;
-
-    let report = if let Some(config_path) = optional_flag(args, "--config") {
-        let config = load_config(&PathBuf::from(config_path))?;
-        if let Some(rules) = resolve_ruleset_for_scan(args)? {
-            scan_config_with_rules(&config, &rules)
+    let rules = resolve_ruleset_for_scan(args)?;
+    let (profile_path, config, report) = if let Some(config_path) = optional_flag(args, "--config") {
+        let config_path = PathBuf::from(config_path);
+        let config = load_config(&config_path)?;
+        let report = if let Some(rules) = rules.as_ref() {
+            scan_config_with_rules(&config, rules)
         } else {
             scan_config(&config)
-        }
+        };
+        (config_path, config, report)
     } else {
         let profile_dir = resolve_profile_dir(args)?;
-        if let Some(rules) = resolve_ruleset_for_scan(args)? {
-            scan_profile_with_rules(&profile_dir, &rules)?
+        let config = load_config(&profile_dir.join("openclaw.conf"))?;
+        let report = if let Some(rules) = rules.as_ref() {
+            scan_profile_with_rules(&profile_dir, rules)?
         } else {
             scan_profile_dir(&profile_dir)?
-        }
+        };
+        (profile_dir, config, report)
     };
 
     let rendered = render_report(&report, &format, locale)?;
@@ -101,6 +107,11 @@ fn run_check(args: &[String]) -> Result<(), String> {
         fs::write(&path, rendered).map_err(|error| format!("failed to write report {path}: {error}"))?;
         println!("report written to {path}");
     } else {
+        println!("profile_path={}", profile_path.display());
+        println!(
+            "local_probe={}",
+            probe_local_service(&config.bind_address, config.port)
+        );
         println!("{rendered}");
     }
 
@@ -425,25 +436,14 @@ fn resolve_ruleset_for_scan(args: &[String]) -> Result<Option<Ruleset>, String> 
 }
 
 fn discover_profile_dir() -> Result<PathBuf, String> {
-    for candidate in profile_search_candidates() {
-        if candidate.join("openclaw.conf").exists() {
-            return Ok(candidate);
-        }
-    }
-
-    Err(
-        "could not auto-discover an OpenClaw profile; use --path <dir> or --config <path>"
-            .to_string(),
-    )
+    discover_profile_under_roots(profile_search_candidates(), 3)
 }
 
 fn profile_search_candidates() -> Vec<PathBuf> {
     let mut candidates = Vec::new();
 
     if let Ok(current_dir) = env::current_dir() {
-        candidates.push(current_dir.clone());
-        candidates.push(current_dir.join("openclaw"));
-        candidates.push(current_dir.join(".openclaw"));
+        candidates.push(current_dir);
     }
 
     if let Some(home) = env::var_os("HOME").map(PathBuf::from) {
@@ -457,6 +457,48 @@ fn profile_search_candidates() -> Vec<PathBuf> {
     }
 
     unique_paths(candidates)
+}
+
+fn probe_local_service(bind_address: &str, port: u16) -> String {
+    if let Ok(value) = env::var("CLAWGUARD_TEST_PROBE_RESULT") {
+        return value;
+    }
+
+    let timeout = Duration::from_millis(250);
+    for address in local_probe_candidates(bind_address, port) {
+        if TcpStream::connect_timeout(&address, timeout).is_ok() {
+            return "reachable".to_string();
+        }
+    }
+
+    "unreachable".to_string()
+}
+
+fn local_probe_candidates(bind_address: &str, port: u16) -> Vec<SocketAddr> {
+    let mut candidates = Vec::new();
+
+    for candidate in probe_address_strings(bind_address, port) {
+        if let Ok(addresses) = candidate.to_socket_addrs() {
+            for address in addresses {
+                if !candidates.iter().any(|existing| existing == &address) {
+                    candidates.push(address);
+                }
+            }
+        }
+    }
+
+    candidates
+}
+
+fn probe_address_strings(bind_address: &str, port: u16) -> Vec<String> {
+    match bind_address {
+        "127.0.0.1" | "localhost" => vec![format!("127.0.0.1:{port}")],
+        "::1" => vec![format!("[::1]:{port}")],
+        "0.0.0.0" => vec![format!("127.0.0.1:{port}")],
+        "::" => vec![format!("[::1]:{port}"), format!("127.0.0.1:{port}")],
+        other if other.contains(':') => vec![format!("[{other}]:{port}")],
+        other => vec![format!("{other}:{port}")],
+    }
 }
 
 fn resolve_install_dir(args: &[String]) -> Result<PathBuf, String> {
@@ -509,6 +551,54 @@ fn unique_paths(paths: Vec<PathBuf>) -> Vec<PathBuf> {
         }
     }
     unique
+}
+
+fn discover_profile_under_roots(roots: Vec<PathBuf>, max_depth: usize) -> Result<PathBuf, String> {
+    for root in unique_paths(roots) {
+        if let Some(path) = search_profile_dir(&root, max_depth)? {
+            return Ok(path);
+        }
+    }
+
+    Err(
+        "could not auto-discover an OpenClaw profile; use --path <dir> or --config <path>"
+            .to_string(),
+    )
+}
+
+fn search_profile_dir(root: &Path, depth: usize) -> Result<Option<PathBuf>, String> {
+    if root.join("openclaw.conf").exists() {
+        return Ok(Some(root.to_path_buf()));
+    }
+
+    if depth == 0 || !root.is_dir() {
+        return Ok(None);
+    }
+
+    let entries = match fs::read_dir(root) {
+        Ok(entries) => entries,
+        Err(_) => return Ok(None),
+    };
+
+    let mut directories = entries
+        .filter_map(Result::ok)
+        .filter_map(|entry| {
+            entry
+                .file_type()
+                .ok()
+                .filter(|file_type| file_type.is_dir())
+                .map(|_| entry.path())
+        })
+        .collect::<Vec<_>>();
+    directories.sort();
+
+    for directory in directories {
+        if let Some(path) = search_profile_dir(&directory, depth - 1)? {
+            return Ok(Some(path));
+        }
+    }
+
+    Ok(None)
 }
 
 fn prompt_for_confirmation(prompt: &str) -> Result<(), String> {
