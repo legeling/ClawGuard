@@ -17,8 +17,8 @@ The architecture must satisfy five constraints:
 
 - Core language: Rust
 - CLI shell: Rust binary
-- Core serialization: `serde`
-- Rules parsing: YAML and JSON
+- Core serialization: `serde` and `serde_json`
+- Rules parsing: signed JSON packs plus plain-text local overrides
 - Reporting: HTML templates plus PDF export
 - Localization: locale-aware report templates and documentation bundles
 
@@ -83,9 +83,11 @@ Responsibilities:
 Responsibilities:
 
 - Load signed rules packs
-- Validate version compatibility
+- Validate version compatibility and Ed25519 signatures
 - Evaluate findings against advisories, baselines, and IOC rules
 - Support local custom rules layered on top of vendor rules
+- Persist imported packs in a local rules store
+- Track the active rules version and rollback history
 
 ### 4.5 `reporting`
 
@@ -131,9 +133,9 @@ Responsibilities:
 ### 5.3 Rules Update Flow
 
 1. Client fetches or imports a signed rules pack
-2. Signature and version compatibility are verified
-3. Rules are staged before activation
-4. The active ruleset pointer is updated
+2. Signature and version compatibility are verified before import
+3. Rules are stored under a versioned local rules-store path
+4. The active ruleset pointer is updated explicitly by activation
 5. Previous ruleset remains available for rollback
 
 ## 6. Data Model Overview

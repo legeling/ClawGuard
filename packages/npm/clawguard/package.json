@@ -1,0 +1,25 @@
+{
+  "name": "clawguard",
+  "version": "0.1.0",
+  "description": "CLI-first security audit and hardening tool for OpenClaw deployments",
+  "bin": {
+    "clawguard": "bin/clawguard.js"
+  },
+  "files": [
+    "bin",
+    "scripts",
+    "README.md"
+  ],
+  "scripts": {
+    "postinstall": "node scripts/postinstall.js",
+    "test": "node scripts/test-install.js"
+  },
+  "keywords": [
+    "openclaw",
+    "security",
+    "cli",
+    "audit",
+    "hardening"
+  ],
+  "license": "UNLICENSED"
+}

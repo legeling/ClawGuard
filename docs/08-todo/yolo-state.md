@@ -3,9 +3,9 @@
 requirement: "Build Clawguard end-to-end from requirements to implementation"
 mode: evolve
 started: 2026-03-12
-current_round: 4
+current_round: 5
 max_rounds: 10
-total_improvements: 8
+total_improvements: 13
 status: running
 
 toolchain:
@@ -17,7 +17,7 @@ toolchain:
 code_map:
   source_files:
     - path: "crates/core-engine/src/lib.rs"
-      lines: 931
+      lines: 1180
       exports:
         - "OpenClawConfig"
         - "Ruleset"
@@ -26,13 +26,26 @@ code_map:
         - "scan_profile_dir"
         - "scan_profile_with_rules"
         - "harden_config_file"
+        - "load_ruleset"
+    - path: "crates/core-engine/src/rules_store.rs"
+      lines: 413
+      exports:
+        - "RulesPackPayload"
+        - "SignedRulesPack"
+        - "import_rules_pack"
+        - "activate_rules_pack"
+        - "rollback_rules_pack"
+        - "load_active_ruleset"
     - path: "crates/cli/src/main.rs"
-      lines: 148
+      lines: 459
       exports:
         - "main"
         - "run_scan"
         - "run_scan_profile"
         - "run_harden"
+        - "run_import_rules_pack"
+        - "run_activate_rules"
+        - "run_rollback_rules"
   entrypoints:
     - "crates/cli/src/main.rs"
   test_mappings:
@@ -40,6 +53,10 @@ code_map:
       tests:
         - "crates/core-engine/tests/ruleset.rs"
         - "crates/core-engine/tests/profile_scan.rs"
+        - "crates/core-engine/tests/localization.rs"
+    - source: "crates/core-engine/src/rules_store.rs"
+      tests:
+        - "crates/core-engine/tests/rules_pack_store.rs"
     - source: "crates/cli/src/main.rs"
       tests:
         - "crates/cli/tests/cli_flow.rs"
@@ -59,8 +76,9 @@ conductor:
   blocked_dimensions: []
   failure_patterns:
     - "CLI integration tests initially assumed Cargo would inject a binary path env var in this workspace layout."
+    - "Adding cryptographic signing required fetching new crates, so workspace verification now depends on network-enabled dependency resolution."
   efficiency: "high"
-  strategy: "Continue from the stable Rust MVP by expanding deployment coverage, updateability, and packaging for a CLI-only product."
+  strategy: "Continue from the stable Rust MVP by turning the scanner into a manageable security product: signed rule lifecycle first, then auto-discovery and one-command operator flows."
 
 rounds:
   - round: 0
@@ -165,16 +183,50 @@ rounds:
           - "docs/cli-installation.md"
           - "scripts/package-release.sh"
           - "README.md"
+  - round: 5
+    test_summary: "18 passed, 0 failed, 0 skipped"
+    lint_errors: 0
+    pm_score: 8.4
+    improvements:
+      - id: R5-01
+        dimension: "function"
+        title: "Add signed rules-pack lifecycle management"
+        status: done
+        files_changed:
+          - "crates/core-engine/Cargo.toml"
+          - "crates/core-engine/src/lib.rs"
+          - "crates/core-engine/src/rules_store.rs"
+          - "crates/core-engine/tests/rules_pack_store.rs"
+      - id: R5-02
+        dimension: "function"
+        title: "Expose rules store management through the CLI"
+        status: done
+        files_changed:
+          - "crates/cli/src/main.rs"
+          - "crates/cli/tests/cli_flow.rs"
+      - id: R5-03
+        dimension: "operations"
+        title: "Document signed rules-pack workflows and fix uninstall guidance"
+        status: done
+        files_changed:
+          - "README.md"
+          - "docs/cli-installation.md"
+          - "docs/openclaw-guard-architecture.md"
+          - "rules/README.md"
 
 deferred_issues:
-  - id: R5-01
+  - id: R6-01
+    title: "Add one-command local auto-discovery and operator flows"
+    impact: 5
+    reason: "The product still exposes low-level scan, harden, and uninstall commands instead of one-command check/fix/remove flows."
+  - id: R6-02
     title: "Add artifact signing and verification workflow"
     impact: 5
     reason: "Packaging exists, but release artifacts and rules packs are not signed yet."
-  - id: R5-02
-    title: "Add signed update and rules-pack verification workflow"
+  - id: R6-03
+    title: "Add online trusted rules update workflow"
     impact: 5
-    reason: "Rules are extensible but not yet packaged or signature-verified."
+    reason: "Rules packs can be signed and imported locally, but there is no online update check, trusted keyring, or staged download flow."
 
 failure_lessons:
   - round: 1
@@ -187,6 +239,11 @@ failure_lessons:
     failure_type: "lint_error"
     description: "Locale support introduced a Clippy lifetime warning and an unused import during the green phase."
     takeaway: "Treat lint as part of the TDD verify step and keep CLI imports minimal after refactors."
+  - round: 5
+    improvement_id: "R5-01"
+    failure_type: "build_error"
+    description: "The signed rules-pack implementation introduced new cryptography dependencies that could not be fetched under sandboxed network restrictions."
+    takeaway: "When a feature requires new ecosystem crates, expect dependency download to be part of the verification path and request escalation early."
 
 round_decisions:
   - round: 1
@@ -197,3 +254,5 @@ round_decisions:
     note: "The product direction is now explicitly CLI-only, so desktop and frontend work was removed from the active roadmap."
   - round: 4
     note: "Prioritized locale-aware output and packaging because the MVP was runnable but still weak on operator usability and distribution."
+  - round: 5
+    note: "Prioritized a signed rules runtime before adding more detectors, because updateability and trust are product-critical for a security tool."

@@ -7,12 +7,23 @@ TARGET_TRIPLE="${TARGET_TRIPLE:-$(rustc -vV | awk '/host:/ {print $2}')}"
 OUTPUT_DIR="${OUTPUT_DIR:-artifacts}"
 PACKAGE_NAME="clawguard-${VERSION}-${TARGET_TRIPLE}"
 PACKAGE_DIR="${OUTPUT_DIR}/${PACKAGE_NAME}"
+BINARY_NAME="clawguard"
+
+if [[ "${TARGET_TRIPLE}" == *windows* ]]; then
+  BINARY_NAME="clawguard.exe"
+fi
+
+if [[ "${VERSION}" == v* ]]; then
+  VERSION="${VERSION#v}"
+  PACKAGE_NAME="clawguard-${VERSION}-${TARGET_TRIPLE}"
+  PACKAGE_DIR="${OUTPUT_DIR}/${PACKAGE_NAME}"
+fi
 
 echo "Building release binary for ${PACKAGE_NAME}"
-cargo build --release -p clawguard
+cargo build --release --target "${TARGET_TRIPLE}" -p clawguard
 
 mkdir -p "${PACKAGE_DIR}"
-cp "target/release/clawguard" "${PACKAGE_DIR}/clawguard"
+cp "target/${TARGET_TRIPLE}/release/${BINARY_NAME}" "${PACKAGE_DIR}/${BINARY_NAME}"
 cp "README.md" "${PACKAGE_DIR}/README.md"
 cp "docs/cli-installation.md" "${PACKAGE_DIR}/INSTALL.md"
 cp "docs/vulnerability-tracker.md" "${PACKAGE_DIR}/VULNERABILITIES.md"

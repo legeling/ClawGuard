@@ -1,3 +1,4 @@
 # Rules
 
-Reserved for signed advisory, baseline, IOC, and supply-chain rules packs.
+Plain-text local rules files can live here for development.
+Signed JSON rules packs are imported into the local rules store at runtime and activated by version.

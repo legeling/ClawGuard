@@ -104,3 +104,32 @@
 
 - **[Security] Add artifact signing and verification workflow** (`R5-01`) -> next round
 - **[Security] Add signed update and rules-pack verification workflow** (`R5-02`) -> next round
+
+## Round 5 - 2026-03-12
+
+**PM Score:** 8.4/10  
+**Tests:** 18 passed / 0 failed / 0 skipped  
+**Lint:** 0 errors
+
+### Changes
+
+1. **[Function] Add signed rules-pack lifecycle management** (`R5-01`) ✅
+   - Problem: the scanner supported custom rules files, but there was no trustworthy way to version, verify, activate, or roll back security content.
+   - Change: added a signed rules-pack model, Ed25519 verification, local rules store import, activation, rollback, and active rules loading.
+   - Verification: new core tests cover import, activation, rollback, and tamper rejection.
+
+2. **[Function] Expose rules store management through the CLI** (`R5-02`) ✅
+   - Problem: operators could not manage rule lifecycle without manually editing files.
+   - Change: added CLI commands for key generation, rules-pack signing, import, activation, rollback, status inspection, and scanning against the active rules store.
+   - Verification: CLI integration tests pass for full keygen -> sign -> import -> activate -> scan -> rollback flows.
+
+3. **[Operations] Document signed rules-pack workflows and fix uninstall guidance** (`R5-03`) ✅
+   - Problem: installation and update guidance lagged behind the implementation, and Cargo uninstall guidance was incorrect.
+   - Change: updated the README, CLI installation guide, architecture notes, and rules README to document the signed rules workflow and correct the uninstall path.
+   - Verification: `cargo test --workspace` and `cargo clippy --workspace --all-targets -- -D warnings` pass after the doc-aligned implementation.
+
+### Deferred
+
+- **[Function] Add one-command local auto-discovery and operator flows** (`R6-01`) -> next round
+- **[Security] Add artifact signing and verification workflow** (`R6-02`) -> next round
+- **[Security] Add online trusted rules update workflow** (`R6-03`) -> next round

@@ -1,3 +1,14 @@
+mod rules_store;
+
+pub use rules_store::{
+    activate_rules_pack, create_signed_rules_pack, default_rules_store_dir,
+    generate_signing_keypair_hex, import_rules_pack, load_active_ruleset, load_rules_pack,
+    parse_rules_pack, render_rules_pack_json, rollback_rules_pack, rules_store_status,
+    verify_rules_pack, write_rules_pack, ImportedRulesPack, RulesActivationOutcome,
+    RulesPackPayload, RulesStoreStatus, SignedRulesPack,
+};
+
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -98,7 +109,7 @@ pub struct ScanReport {
     pub risk_score: u8,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Ruleset {
     pub trusted_origins: Vec<String>,
     pub suspicious_skill_patterns: Vec<String>,
@@ -329,6 +340,14 @@ pub fn scan_config(config: &OpenClawConfig) -> ScanReport {
 pub fn load_ruleset(path: &Path) -> Result<Ruleset, String> {
     let content = fs::read_to_string(path)
         .map_err(|error| format!("failed to read {}: {error}", path.display()))?;
+    if let Ok(pack) = parse_rules_pack(&content) {
+        return Ok(pack.payload.rules);
+    }
+
+    if let Ok(rules) = serde_json::from_str::<Ruleset>(&content) {
+        return Ok(rules);
+    }
+
     Ruleset::parse(&content)
 }
 

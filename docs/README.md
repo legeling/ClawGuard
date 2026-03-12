@@ -1,4 +1,4 @@
-# Clawguard Documentation
+# ClawGuard Documentation
 
 This repository uses English as the source-of-truth language for product, design, code comments, and operational documentation.
 Chinese can be shipped as an optional UI locale and translated documentation set later, but English stays canonical.
@@ -9,6 +9,7 @@ Chinese can be shipped as an optional UI locale and translated documentation set
 - [Product Requirements](./openclaw-guard-requirements.md)
 - [Solution Architecture](./openclaw-guard-architecture.md)
 - [CLI Installation](./cli-installation.md)
+- [CI/CD](./cicd.md)
 - [Documentation Management](./documentation-management.md)
 - [Vulnerability Tracker](./vulnerability-tracker.md)
 
