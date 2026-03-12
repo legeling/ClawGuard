@@ -639,7 +639,7 @@ pub fn render_report_html(report: &ScanReport) -> String {
     format!(
         concat!(
             "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">",
-            "<title>OpenClaw Guard Report</title>",
+            "<title>Clawguard Report</title>",
             "<style>",
             "body{{font-family:Georgia,serif;background:#f4f0e8;color:#1f2933;margin:0;padding:32px;}}",
             ".hero{{background:linear-gradient(135deg,#0f4c5c,#e36414);color:#fff;padding:24px;border-radius:18px;margin-bottom:24px;}}",
@@ -653,7 +653,7 @@ pub fn render_report_html(report: &ScanReport) -> String {
             ".low{{background:#166534;color:#dcfce7;}}",
             "h1,h2{{margin:0 0 12px 0;}}",
             "</style></head><body>",
-            "<section class=\"hero\"><h1>OpenClaw Guard Report</h1><p>Profile: {profile}</p>",
+            "<section class=\"hero\"><h1>Clawguard Report</h1><p>Profile: {profile}</p>",
             "<div class=\"metrics\"><div class=\"metric\">Risk Score: {score}</div><div class=\"metric\">Findings: {count}</div></div></section>",
             "{rows}",
             "</body></html>"
@@ -1001,7 +1001,7 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .map(|duration| duration.as_nanos())
             .unwrap_or(0);
-        let path = env::temp_dir().join(format!("openclaw-guard-{unique}.conf"));
+        let path = env::temp_dir().join(format!("clawguard-{unique}.conf"));
         write_config(&path, &config).expect("config should be written");
 
         let outcome = harden_config_file(&path, None, true).expect("hardening should succeed");

@@ -1,6 +1,6 @@
-# OpenClaw Guard
+# Clawguard
 
-OpenClaw Guard is a cross-platform security audit and one-click hardening tool for OpenClaw deployments and adjacent ecosystem components.
+Clawguard is a CLI-first security audit and one-click hardening tool for OpenClaw deployments and adjacent ecosystem components.
 
 ## Current Status
 
@@ -14,11 +14,9 @@ Canonical project documents live in `docs/`:
 - `docs/documentation-management.md`
 - `docs/vulnerability-tracker.md`
 
-## Planned Stack
+## Current Stack
 
 - Rust core engine
-- Tauri 2 desktop shell
-- React + TypeScript frontend
 - Signed YAML and JSON rules packs
 - HTML, PDF, and JSON reporting
 
@@ -34,42 +32,42 @@ The repository currently ships a Rust workspace with:
 Generate a sample configuration:
 
 ```bash
-cargo run -p openclaw-guard -- sample-config --output example.conf
+cargo run -p clawguard -- sample-config --output example.conf
 ```
 
 Generate a sample ruleset:
 
 ```bash
-cargo run -p openclaw-guard -- sample-rules --output rules/default.rules
+cargo run -p clawguard -- sample-rules --output rules/default.rules
 ```
 
 Scan a configuration:
 
 ```bash
-cargo run -p openclaw-guard -- scan --config example.conf --format json
+cargo run -p clawguard -- scan --config example.conf --format json
 ```
 
 Scan with a custom ruleset:
 
 ```bash
-cargo run -p openclaw-guard -- scan --config example.conf --rules rules/default.rules
+cargo run -p clawguard -- scan --config example.conf --rules rules/default.rules
 ```
 
 Scan a deployment directory:
 
 ```bash
-cargo run -p openclaw-guard -- scan-profile --path /path/to/openclaw-profile --format html --output report.html
+cargo run -p clawguard -- scan-profile --path /path/to/openclaw-profile --format html --output report.html
 ```
 
 Apply hardening to a new output file:
 
 ```bash
-cargo run -p openclaw-guard -- harden --config example.conf --output hardened.conf
+cargo run -p clawguard -- harden --config example.conf --output hardened.conf
 ```
 
 ## Repository Conventions
 
 - Repository content is English-first.
-- UI defaults to English and supports Simplified Chinese as an optional locale.
+- Reports default to English and can support Simplified Chinese as an optional locale.
 - Code comments must be written in English.
 - Security-impacting changes should update both the tracker and the relevant docs.

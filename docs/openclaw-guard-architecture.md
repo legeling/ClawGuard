@@ -1,4 +1,4 @@
-# OpenClaw Guard Solution Architecture
+# Clawguard Solution Architecture
 
 Version: v0.1  
 Updated: 2026-03-12
@@ -8,7 +8,7 @@ Updated: 2026-03-12
 The architecture must satisfy five constraints:
 
 1. Cross-platform delivery on macOS, Windows, and Linux
-2. Shared detection and remediation logic across GUI and CLI
+2. Shared detection and remediation logic across CLI commands
 3. Safe, auditable remediation with backup and rollback
 4. Fast response to new OpenClaw disclosures through ruleset updates
 5. English-first product and engineering workflow with optional Chinese localization
@@ -16,18 +16,15 @@ The architecture must satisfy five constraints:
 ## 2. Recommended Stack
 
 - Core language: Rust
-- Desktop shell: Tauri 2
-- UI: React + TypeScript
-- Styling: Tailwind CSS plus a custom component layer
-- Local state: Zustand or Redux Toolkit, depending on complexity at implementation time
+- CLI shell: Rust binary
 - Core serialization: `serde`
 - Rules parsing: YAML and JSON
 - Reporting: HTML templates plus PDF export
-- Localization: ICU-style message catalogs
+- Localization: locale-aware report templates and documentation bundles
 
 ## 3. System Topology
 
-OpenClaw Guard should be organized into one shared engine and two shells:
+Clawguard should be organized into one shared engine and one shell:
 
 1. Shared Core
    - Asset discovery
@@ -39,13 +36,7 @@ OpenClaw Guard should be organized into one shared engine and two shells:
    - Backup and rollback
    - Report generation
 
-2. Desktop Shell
-   - Tauri host
-   - React UI
-   - Interactive remediation flow
-   - Export and report viewing
-
-3. CLI Shell
+2. CLI Shell
    - Non-interactive automation
    - CI and scripting support
    - JSON-first output mode
@@ -112,7 +103,7 @@ Responsibilities:
 - Abstract filesystem and permission differences
 - Support platform-specific process enumeration
 - Support platform-specific firewall or networking checks
-- Handle desktop packaging specifics
+- Handle platform-specific packaging specifics
 
 ## 5. End-to-End Flow
 
@@ -216,13 +207,11 @@ The project should be English-first:
 - Product copy authored in English
 - Code comments in English only
 - Engineering docs in English only
-- Chinese provided as an optional UI locale and optional translated docs set
+- Chinese provided as an optional report locale and optional translated docs set
 
 Implementation expectations:
 
-- All UI strings referenced by keys
-- No hardcoded display strings in components
-- Report templates rendered from localized message catalogs
+- Report templates rendered from localized message bundles
 - Missing translations fall back to English
 
 ## 10. Documentation Management Design
@@ -263,7 +252,7 @@ Recommended UX principles:
 Phase 2 recommendation:
 
 1. Build the Rust core as the source of truth
-2. Expose the same engine to GUI and CLI
+2. Expose the engine through a stable CLI
 3. Treat rules packs as versioned signed content
 4. Implement localization from day one
 5. Design the report system as a first-class output, not a post-processing layer

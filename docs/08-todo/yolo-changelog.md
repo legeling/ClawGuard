@@ -51,5 +51,28 @@
 
 ### Deferred
 
-- **[Desktop] Bootstrap desktop shell and frontend workspace** (`R3-01`) -> next round
+- **[Packaging] Add release packaging and install workflow** (`R3-01`) -> next round
 - **[Security] Add signed update and rules-pack verification workflow** (`R3-02`) -> next round
+
+## Round 3 - 2026-03-12
+
+**PM Score:** 7.6/10  
+**Tests:** 9 passed / 0 failed / 0 skipped  
+**Lint:** 0 errors
+
+### Changes
+
+1. **[Scope] Rename the project to Clawguard** (`R3-01`) ✅
+   - Problem: the project still used the temporary working name in code, docs, and package metadata.
+   - Change: renamed the Rust packages, CLI binary, report branding, and project-level metadata to `Clawguard`.
+   - Verification: the workspace builds and tests under the new `clawguard` package name.
+
+2. **[Requirements] Switch the product direction to CLI-only** (`R3-02`) ✅
+   - Problem: the docs still assumed a frontend and desktop shell, which no longer matches the actual product need.
+   - Change: updated the requirements, architecture, project rules, and active issue tracking to a CLI-only roadmap.
+   - Verification: repository docs and implementation scope now align around the command-line product boundary.
+
+### Deferred
+
+- **[Packaging] Add release packaging and install workflow** (`R4-01`) -> next round
+- **[Security] Add signed update and rules-pack verification workflow** (`R4-02`) -> next round

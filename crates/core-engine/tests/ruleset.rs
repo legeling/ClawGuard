@@ -1,4 +1,4 @@
-use openclaw_guard_core::{scan_config_with_rules, OpenClawConfig, Ruleset};
+use clawguard_core::{scan_config_with_rules, OpenClawConfig, Ruleset};
 
 #[test]
 fn custom_ruleset_can_change_trust_and_supply_chain_detection() {

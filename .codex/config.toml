@@ -1,6 +1,6 @@
 [project]
-name = "openclaw-guard"
-mission = "Cross-platform OpenClaw security audit and one-click hardening"
+name = "clawguard"
+mission = "CLI-first OpenClaw security audit and one-click hardening"
 repository_language = "en"
 default_ui_locale = "en"
 supported_ui_locales = ["en", "zh-CN"]
@@ -34,15 +34,12 @@ project_context = ".codex/project-context.md"
 [product]
 category = "security-hardening-tool"
 default_report_formats = ["html", "pdf", "json"]
-primary_modes = ["gui", "cli"]
+primary_modes = ["cli"]
 default_locale_for_reports = "en"
 
 [architecture]
 core = "rust"
-desktop_shell = "tauri"
-frontend = "react"
-frontend_language = "typescript"
-styling = "tailwindcss"
+shell = "cli"
 rules_format = ["yaml", "json"]
 
 [quality]

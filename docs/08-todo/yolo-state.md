@@ -1,11 +1,11 @@
-# YOLO State - OpenClaw Guard
+# YOLO State - Clawguard
 
-requirement: "Build OpenClaw Guard end-to-end from requirements to implementation"
+requirement: "Build Clawguard end-to-end from requirements to implementation"
 mode: evolve
 started: 2026-03-12
-current_round: 2
+current_round: 3
 max_rounds: 10
-total_improvements: 5
+total_improvements: 6
 status: running
 
 toolchain:
@@ -13,7 +13,6 @@ toolchain:
   lint_cmd: "cargo clippy --workspace --all-targets -- -D warnings"
   test_cmd: "cargo test --workspace"
   build_cmd: "cargo build --workspace"
-  frontend_pkg_manager: "pnpm"
 
 code_map:
   source_files:
@@ -61,7 +60,7 @@ conductor:
   failure_patterns:
     - "CLI integration tests initially assumed Cargo would inject a binary path env var in this workspace layout."
   efficiency: "high"
-  strategy: "Continue from the stable Rust MVP by expanding real deployment coverage and then add desktop-shell scaffolding once dependency installation is acceptable."
+  strategy: "Continue from the stable Rust MVP by expanding deployment coverage, updateability, and packaging for a CLI-only product."
 
 rounds:
   - round: 0
@@ -115,13 +114,37 @@ rounds:
         status: done
         files_changed:
           - "crates/cli/tests/cli_flow.rs"
+  - round: 3
+    test_summary: "9 passed, 0 failed, 0 skipped"
+    lint_errors: 0
+    pm_score: 7.6
+    improvements:
+      - id: R3-01
+        dimension: "scope"
+        title: "Rename the project to Clawguard"
+        status: done
+        files_changed:
+          - "README.md"
+          - "AGENTS.md"
+          - ".codex/config.toml"
+          - "crates/cli/Cargo.toml"
+          - "crates/core-engine/Cargo.toml"
+      - id: R3-02
+        dimension: "requirements"
+        title: "Switch the product direction to CLI-only"
+        status: done
+        files_changed:
+          - "docs/openclaw-guard-requirements.md"
+          - "docs/openclaw-guard-architecture.md"
+          - "docs/openclaw-security-insights.md"
+          - "docs/09-issues/active/cli-packaging-distribution.md"
 
 deferred_issues:
-  - id: R3-01
-    title: "Bootstrap desktop shell and frontend workspace"
+  - id: R4-01
+    title: "Add release packaging and install workflow"
     impact: 5
-    reason: "The current MVP is CLI-first. Desktop and web shells still need implementation."
-  - id: R3-02
+    reason: "The scanner works as a development binary, but CLI packaging and distribution are not finalized."
+  - id: R4-02
     title: "Add signed update and rules-pack verification workflow"
     impact: 5
     reason: "Rules are extensible but not yet packaged or signature-verified."
@@ -135,6 +158,8 @@ failure_lessons:
 
 round_decisions:
   - round: 1
-    note: "Prioritized extensibility and CLI coverage over desktop scaffolding."
+    note: "Prioritized extensibility and CLI coverage over any shell expansion."
   - round: 2
     note: "Prioritized real deployment directory scanning because config-only scanning was too narrow for the documented requirements."
+  - round: 3
+    note: "The product direction is now explicitly CLI-only, so desktop and frontend work was removed from the active roadmap."

@@ -1,4 +1,4 @@
-# OpenClaw Security Insights
+# Clawguard Security Insights
 
 Updated: 2026-03-12
 
@@ -139,13 +139,13 @@ To keep the product extensible, detection and remediation should be modeled by a
 - Unsigned or untrusted update packages
 - Risky shell snippets copied from third-party pages
 
-## 4. Product Implications for OpenClaw Guard
+## 4. Product Implications for Clawguard
 
 To cover the actual risk surface, the product needs at least:
 
 1. Asset discovery
    - Detect local installations
-   - Detect desktop, source, container, and reverse-proxy deployments
+   - Detect standalone binary, source, container, and reverse-proxy deployments
    - Detect public reachability and open exposure points
 
 2. Rule-driven auditing
@@ -176,15 +176,14 @@ The implementation should favor:
 
 - Strong cross-platform support
 - Safe handling of files, networking, processes, and privilege-sensitive operations
-- Shared core logic for GUI and CLI
+- Shared core logic for scanning, remediation, and reporting
 - Signed rule updates and offline packs
 - A clean boundary between detectors, remediators, and report generation
 
 Recommended baseline:
 
 - Core engine: Rust
-- Desktop shell: Tauri 2
-- Frontend: React + TypeScript
+- CLI shell: Rust binary
 - Rules format: YAML or JSON with version and signature metadata
 - Reporting: HTML-first with PDF export
 

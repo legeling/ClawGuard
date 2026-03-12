@@ -1,7 +1,7 @@
 [package]
-name = "openclaw-guard"
+name = "clawguard"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-openclaw-guard-core = { path = "../core-engine" }
+clawguard-core = { path = "../core-engine" }

@@ -2,7 +2,7 @@
 
 ## Project Identity
 
-- Project name: `OpenClaw Guard`
+- Project name: `Clawguard`
 - Mission: build a cross-platform OpenClaw security audit and one-click hardening tool
 - Canonical repository language: English
 
@@ -35,7 +35,7 @@ When product scope or security posture changes:
 ## Engineering Principles
 
 - Prefer a shared Rust core for scanning, rule evaluation, remediation, rollback, and reporting.
-- Keep GUI and CLI as thin shells over the same core logic.
+- Keep the project CLI-first. Do not introduce a frontend shell unless explicitly requested.
 - Treat rule packs as versioned and signature-verified content.
 - Design remediation to be safe-by-default, auditable, and reversible.
 - Favor modular detectors, remediators, report generators, and platform adapters.

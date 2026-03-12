@@ -1,8 +1,8 @@
-# OpenClaw Guard Project Context
+# Clawguard Project Context
 
 ## Overview
 
-OpenClaw Guard is a cross-platform security audit and one-click hardening product for OpenClaw deployments and related ecosystem components.
+Clawguard is a CLI-first security audit and one-click hardening product for OpenClaw deployments and related ecosystem components.
 
 The product must detect:
 
@@ -37,7 +37,7 @@ The product must also provide:
 ## Current Product Direction
 
 - Build a shared Rust core.
-- Expose the core through Tauri desktop and CLI shells.
+- Expose the core through a stable CLI.
 - Keep detectors, remediators, reporting, and platform adapters modular.
 - Treat documentation and vulnerability tracking as first-class project assets.
 

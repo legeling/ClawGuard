@@ -1,4 +1,4 @@
-use openclaw_guard_core::{
+use clawguard_core::{
     default_ruleset_text, harden_config_file, load_config, load_ruleset, render_report_html,
     render_report_json, sample_config, scan_config, scan_config_with_rules, scan_profile_dir,
     scan_profile_with_rules,
@@ -155,7 +155,7 @@ fn optional_flag(args: &[String], flag: &str) -> Option<String> {
 }
 
 fn print_usage() {
-    println!("OpenClaw Guard CLI");
+    println!("Clawguard CLI");
     println!();
     println!("Commands:");
     println!("  scan --config <path> [--format json|html] [--output <path>]");

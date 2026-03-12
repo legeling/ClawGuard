@@ -1,4 +1,4 @@
-use openclaw_guard_core::{scan_profile_with_rules, Ruleset};
+use clawguard_core::{scan_profile_with_rules, Ruleset};
 use std::env;
 use std::fs;
 use std::time::{SystemTime, UNIX_EPOCH};

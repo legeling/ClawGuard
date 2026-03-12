@@ -1,11 +1,11 @@
-# OpenClaw Guard Product Requirements
+# Clawguard Product Requirements
 
 Version: v0.2  
 Updated: 2026-03-12
 
 ## 1. Product Positioning
 
-OpenClaw Guard is a cross-platform security audit and one-click hardening tool for the OpenClaw ecosystem. It is designed to deliver the following workflow for both desktop and command-line users:
+Clawguard is a CLI-first security audit and one-click hardening tool for the OpenClaw ecosystem. It is designed to deliver the following workflow for command-line users and automation pipelines:
 
 1. Discover assets and exposure points
 2. Identify known vulnerabilities and unsafe configurations
@@ -71,7 +71,7 @@ Need extensible rules, evidence-backed findings, rollback behavior, and traceabl
 9. Guided remediation and rollback
 10. Rich report rendering and export
 11. Ruleset updates and extensibility
-12. English-first UI and documentation with optional Chinese localization
+12. English-first reporting and documentation with optional Chinese localization
 
 ### 5.2 Should-Have Capabilities
 
@@ -88,7 +88,7 @@ Need extensible rules, evidence-backed findings, rollback behavior, and traceabl
 The system must:
 
 - Detect whether OpenClaw is installed locally
-- Detect deployment mode: desktop app, source install, container, or reverse-proxy publish
+- Detect deployment mode: standalone binary, source install, container, or reverse-proxy publish
 - Detect listening addresses, ports, and process metadata
 - Determine whether the target is reachable from the public internet
 
@@ -191,7 +191,7 @@ The system must generate reports that include:
 
 Supported outputs:
 
-- In-app interactive report
+- Terminal summary
 - HTML export
 - PDF export
 - JSON export
@@ -224,15 +224,14 @@ Requirements:
 
 - Shared scanning logic across platforms
 - Platform differences isolated in adapters
-- Both GUI and CLI entry points
+- CLI entry point with scriptable output
 
 ### FR-11 Internationalization
 
 The system must support:
 
-- English as the default UI locale
-- Simplified Chinese as an optional locale
-- Translation keys for all end-user strings
+- English as the default command and report language
+- Simplified Chinese as an optional report locale
 - Locale-aware report rendering
 
 The project must also enforce:
@@ -284,7 +283,7 @@ The project must maintain:
 - Translation coverage must be trackable
 - Missing translations must gracefully fall back to English
 
-## 8. UX and Reporting Expectations
+## 8. CLI and Reporting Expectations
 
 The product should not feel like a traditional log-dump security tool. It should:
 
@@ -314,19 +313,16 @@ The product should not feel like a traditional log-dump security tool. It should
 Recommended stack:
 
 - Core engine: Rust
-- Desktop shell: Tauri 2
-- Frontend: React + TypeScript
-- Styling: Tailwind CSS plus a custom design system
+- CLI shell: Rust binary
 - Reporting: local HTML rendering with PDF export
 - Rules engine: Rust plus YAML/JSON rules packs
 - Updates: signed rules packs and signed app release metadata
-- Localization: ICU-compatible message format and locale bundles
+- Localization: locale-aware report and documentation bundles
 
 Rationale:
 
 - Rust fits cross-platform binaries, networking, file operations, and security-sensitive logic
-- Tauri has a smaller footprint than Electron and suits a security utility
-- GUI and CLI can share the same engine
+- A CLI-first shell simplifies distribution and operational automation
 - Independent ruleset updates improve response time to newly disclosed issues
 
 ## 10. Initial Delivery Milestones
@@ -367,4 +363,4 @@ At minimum, the release must:
 4. Successfully apply and roll back at least one remediation
 5. Generate a readable, shareable report
 6. Upgrade the ruleset independently of the client
-7. Render the product in English by default and support Chinese as an alternate locale
+7. Render reports in English by default and support Chinese as an alternate locale where implemented

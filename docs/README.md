@@ -1,4 +1,4 @@
-# OpenClaw Guard Documentation
+# Clawguard Documentation
 
 This repository uses English as the source-of-truth language for product, design, code comments, and operational documentation.
 Chinese can be shipped as an optional UI locale and translated documentation set later, but English stays canonical.

@@ -5,7 +5,7 @@ Updated: 2026-03-12
 
 ## 1. Purpose
 
-This document defines how OpenClaw Guard documentation is organized, maintained, and localized.
+This document defines how Clawguard documentation is organized, maintained, and localized.
 
 ## 2. Language Policy
 

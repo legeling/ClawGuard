@@ -9,7 +9,7 @@ fn temp_path(name: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_nanos())
         .unwrap_or(0);
-    env::temp_dir().join(format!("openclaw-guard-{name}-{unique}"))
+    env::temp_dir().join(format!("clawguard-{name}-{unique}"))
 }
 
 fn cli_bin_path() -> PathBuf {
@@ -20,9 +20,9 @@ fn cli_bin_path() -> PathBuf {
         .expect("debug directory should exist");
 
     #[cfg(target_os = "windows")]
-    let bin_name = "openclaw-guard.exe";
+    let bin_name = "clawguard.exe";
     #[cfg(not(target_os = "windows"))]
-    let bin_name = "openclaw-guard";
+    let bin_name = "clawguard";
 
     debug_dir.join(bin_name)
 }
