@@ -1,0 +1,53 @@
+[project]
+name = "openclaw-guard"
+mission = "Cross-platform OpenClaw security audit and one-click hardening"
+repository_language = "en"
+default_ui_locale = "en"
+supported_ui_locales = ["en", "zh-CN"]
+documentation_dir = "docs"
+
+[language_policy]
+code_comments = "en"
+product_docs = "en"
+engineering_docs = "en"
+config_files = "en"
+report_source_language = "en"
+translation_fallback = "en"
+
+[workflow]
+docs_first = true
+require_vulnerability_tracking = true
+require_requirements_sync = true
+require_architecture_sync = true
+require_english_repo_content = true
+
+[paths]
+agents = "AGENTS.md"
+readme = "docs/README.md"
+security_insights = "docs/openclaw-security-insights.md"
+requirements = "docs/openclaw-guard-requirements.md"
+architecture = "docs/openclaw-guard-architecture.md"
+documentation_management = "docs/documentation-management.md"
+vulnerability_tracker = "docs/vulnerability-tracker.md"
+project_context = ".codex/project-context.md"
+
+[product]
+category = "security-hardening-tool"
+default_report_formats = ["html", "pdf", "json"]
+primary_modes = ["gui", "cli"]
+default_locale_for_reports = "en"
+
+[architecture]
+core = "rust"
+desktop_shell = "tauri"
+frontend = "react"
+frontend_language = "typescript"
+styling = "tailwindcss"
+rules_format = ["yaml", "json"]
+
+[quality]
+prefer_ascii = true
+require_evidence_per_finding = true
+require_backup_before_remediation = true
+require_rollback_support = true
+require_signature_verification_for_updates = true
