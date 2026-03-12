@@ -4,7 +4,7 @@ use clawguard_core::{
     load_active_ruleset, load_config, load_ruleset, render_report_html_with_locale,
     render_report_json, render_report_text_with_locale, rollback_rules_pack, rules_store_status,
     sample_config, scan_config, scan_config_with_rules, scan_profile_dir, scan_profile_with_rules,
-    write_rules_pack, Locale, Ruleset,
+    write_rules_pack, Locale, OpenClawConfig, Ruleset, ScanReport,
 };
 use std::env;
 use std::fs;
@@ -25,11 +25,11 @@ fn run() -> Result<(), String> {
     let args = env::args().skip(1).collect::<Vec<_>>();
     let locale = parse_locale(&args)?;
     let Some(command) = args.first().map(String::as_str) else {
-        print_usage(locale);
-        return Ok(());
+        return run_interactive(locale);
     };
 
     match command {
+        "interactive" => run_interactive(locale),
         "check" => run_check(&args[1..]),
         "fix" => run_fix(&args[1..]),
         "remove" => run_remove(&args[1..]),
@@ -51,6 +51,11 @@ fn run() -> Result<(), String> {
         }
         _ => Err(format!("unknown command: {command}")),
     }
+}
+
+enum CheckTarget {
+    Config(PathBuf),
+    Profile(PathBuf),
 }
 
 fn run_scan(args: &[String]) -> Result<(), String> {
@@ -82,40 +87,8 @@ fn run_check(args: &[String]) -> Result<(), String> {
     let output = optional_flag(args, "--output");
     let locale = parse_locale(args)?;
     let rules = resolve_ruleset_for_scan(args)?;
-    let (profile_path, config, report) = if let Some(config_path) = optional_flag(args, "--config") {
-        let config_path = PathBuf::from(config_path);
-        let config = load_config(&config_path)?;
-        let report = if let Some(rules) = rules.as_ref() {
-            scan_config_with_rules(&config, rules)
-        } else {
-            scan_config(&config)
-        };
-        (config_path, config, report)
-    } else {
-        let profile_dir = resolve_profile_dir(args)?;
-        let config = load_config(&profile_dir.join("openclaw.conf"))?;
-        let report = if let Some(rules) = rules.as_ref() {
-            scan_profile_with_rules(&profile_dir, rules)?
-        } else {
-            scan_profile_dir(&profile_dir)?
-        };
-        (profile_dir, config, report)
-    };
-
-    let rendered = render_report(&report, &format, locale)?;
-    if let Some(path) = output {
-        fs::write(&path, rendered).map_err(|error| format!("failed to write report {path}: {error}"))?;
-        println!("report written to {path}");
-    } else {
-        println!("profile_path={}", profile_path.display());
-        println!(
-            "local_probe={}",
-            probe_local_service(&config.bind_address, config.port)
-        );
-        println!("{rendered}");
-    }
-
-    Ok(())
+    let target = resolve_check_target(args)?;
+    execute_check(target, rules, format, output, locale)
 }
 
 fn run_scan_profile(args: &[String]) -> Result<(), String> {
@@ -367,6 +340,90 @@ fn run_remove(args: &[String]) -> Result<(), String> {
     Ok(())
 }
 
+fn run_interactive(locale: Locale) -> Result<(), String> {
+    println!("{}", banner());
+    println!();
+    println!("Interactive Mode");
+    println!("{}", locale_text(locale).tagline);
+    println!();
+
+    loop {
+        println!("1. Check this machine");
+        println!("2. Fix local OpenClaw config");
+        println!("3. Remove installed ClawGuard binary");
+        println!("4. Generate sample config here");
+        println!("5. Exit");
+
+        match prompt_line("Choose an action")?.trim() {
+            "1" => interactive_check(locale)?,
+            "2" => interactive_fix(locale)?,
+            "3" => interactive_remove(locale)?,
+            "4" => interactive_sample_config()?,
+            "5" | "" => return Ok(()),
+            _ => println!("Unknown choice. Enter 1, 2, 3, 4, or 5."),
+        }
+
+        println!();
+    }
+}
+
+fn interactive_check(locale: Locale) -> Result<(), String> {
+    let target = match resolve_check_target(&[]) {
+        Ok(target) => target,
+        Err(_) => match interactive_target_prompt("check")? {
+            Some(target) => target,
+            None => return Ok(()),
+        },
+    };
+
+    execute_check(target, None, "text".to_string(), None, locale)
+}
+
+fn interactive_fix(locale: Locale) -> Result<(), String> {
+    let config_path = match resolve_config_path(&[]) {
+        Ok(path) => path,
+        Err(_) => match interactive_target_prompt("fix")? {
+            Some(CheckTarget::Config(path)) => path,
+            Some(CheckTarget::Profile(path)) => path.join("openclaw.conf"),
+            None => return Ok(()),
+        },
+    };
+
+    let outcome = execute_fix(&config_path, None, true, locale, false)?;
+    println!("Fixed {}", outcome.display());
+    Ok(())
+}
+
+fn interactive_remove(locale: Locale) -> Result<(), String> {
+    let install_dir = match resolve_install_dir(&[]) {
+        Ok(path) => path,
+        Err(_) => match prompt_line(
+            "Enter an install directory, or press Enter to cancel removal",
+        )? {
+            value if value.trim().is_empty() => return Ok(()),
+            value => PathBuf::from(value.trim()),
+        },
+    };
+
+    execute_remove(&install_dir, locale, false)
+}
+
+fn interactive_sample_config() -> Result<(), String> {
+    let output = match prompt_line(
+        "Enter a config path, or press Enter to create ./openclaw.conf",
+    )? {
+        value if value.trim().is_empty() => env::current_dir()
+            .map_err(|error| format!("failed to resolve current directory: {error}"))?
+            .join("openclaw.conf"),
+        value => PathBuf::from(value.trim()),
+    };
+
+    fs::write(&output, sample_config())
+        .map_err(|error| format!("failed to write sample config {}: {error}", output.display()))?;
+    println!("sample config written to {}", output.display());
+    Ok(())
+}
+
 fn run_uninstall(args: &[String]) -> Result<(), String> {
     let locale = parse_locale(args)?;
     let text = locale_text(locale);
@@ -401,6 +458,14 @@ fn resolve_profile_dir(args: &[String]) -> Result<PathBuf, String> {
     discover_profile_dir()
 }
 
+fn resolve_check_target(args: &[String]) -> Result<CheckTarget, String> {
+    if let Some(config_path) = optional_flag(args, "--config") {
+        return Ok(CheckTarget::Config(PathBuf::from(config_path)));
+    }
+
+    resolve_profile_dir(args).map(CheckTarget::Profile)
+}
+
 fn resolve_config_path(args: &[String]) -> Result<PathBuf, String> {
     if let Some(path) = optional_flag(args, "--config") {
         return Ok(PathBuf::from(path));
@@ -433,6 +498,156 @@ fn resolve_ruleset_for_scan(args: &[String]) -> Result<Option<Ruleset>, String> 
     }
 
     Ok(None)
+}
+
+fn execute_check(
+    target: CheckTarget,
+    rules: Option<Ruleset>,
+    format: String,
+    output: Option<String>,
+    locale: Locale,
+) -> Result<(), String> {
+    let (profile_path, config, report) = load_check_execution(target, rules.as_ref())?;
+    let rendered = render_report(&report, &format, locale)?;
+
+    if let Some(path) = output {
+        fs::write(&path, rendered)
+            .map_err(|error| format!("failed to write report {path}: {error}"))?;
+        println!("report written to {path}");
+    } else {
+        println!("profile_path={}", profile_path.display());
+        println!(
+            "local_probe={}",
+            probe_local_service(&config.bind_address, config.port)
+        );
+        println!("{rendered}");
+    }
+
+    Ok(())
+}
+
+fn load_check_execution(
+    target: CheckTarget,
+    rules: Option<&Ruleset>,
+) -> Result<(PathBuf, OpenClawConfig, ScanReport), String> {
+    match target {
+        CheckTarget::Config(config_path) => {
+            let config = load_config(&config_path)?;
+            let report = if let Some(rules) = rules {
+                scan_config_with_rules(&config, rules)
+            } else {
+                scan_config(&config)
+            };
+            Ok((config_path, config, report))
+        }
+        CheckTarget::Profile(profile_dir) => {
+            let config = load_config(&profile_dir.join("openclaw.conf"))?;
+            let report = if let Some(rules) = rules {
+                scan_profile_with_rules(&profile_dir, rules)?
+            } else {
+                scan_profile_dir(&profile_dir)?
+            };
+            Ok((profile_dir, config, report))
+        }
+    }
+}
+
+fn execute_fix(
+    config_path: &Path,
+    output: Option<&Path>,
+    in_place: bool,
+    locale: Locale,
+    assume_yes: bool,
+) -> Result<PathBuf, String> {
+    if !assume_yes {
+        prompt_for_confirmation(&format!(
+            "Apply hardening to {}{}",
+            config_path.display(),
+            if in_place {
+                " in place with a backup"
+            } else {
+                " and write the result to a separate file"
+            }
+        ))?;
+    }
+
+    let outcome = harden_config_file(config_path, output, in_place)?;
+    let text = locale_text(locale);
+    println!("{}", text.hardening_completed);
+    println!("{}={}", text.before_score, outcome.before_score);
+    println!("{}={}", text.after_score, outcome.after_score);
+    println!("{}={}", text.output_path, outcome.output_path.display());
+
+    if let Some(backup_path) = outcome.backup_path {
+        println!("{}={}", text.backup_path, backup_path.display());
+    }
+
+    for action in outcome.applied_actions {
+        println!("{}={action}", text.applied);
+    }
+    for action in outcome.manual_actions {
+        println!("{}={action}", text.manual);
+    }
+
+    Ok(outcome.output_path)
+}
+
+fn execute_remove(install_dir: &Path, locale: Locale, assume_yes: bool) -> Result<(), String> {
+    let text = locale_text(locale);
+    let binary_path = install_dir.join(binary_name());
+
+    if !binary_path.exists() {
+        return Err(format!("{} {}", text.not_found_prefix, binary_path.display()));
+    }
+
+    if !assume_yes {
+        prompt_for_confirmation(&format!("Remove {}", binary_path.display()))?;
+    }
+
+    fs::remove_file(&binary_path)
+        .map_err(|error| format!("failed to remove {}: {error}", binary_path.display()))?;
+    println!("{}={}", text.removed_path, binary_path.display());
+    Ok(())
+}
+
+fn interactive_target_prompt(operation: &str) -> Result<Option<CheckTarget>, String> {
+    println!("No OpenClaw profile was auto-discovered for {operation}.");
+    let input = prompt_line(
+        "Enter a profile directory or config path, type 'sample' to create ./openclaw.conf, or press Enter to cancel",
+    )?;
+    let trimmed = input.trim();
+
+    if trimmed.is_empty() {
+        return Ok(None);
+    }
+
+    if trimmed.eq_ignore_ascii_case("sample") {
+        let config_path = env::current_dir()
+            .map_err(|error| format!("failed to resolve current directory: {error}"))?
+            .join("openclaw.conf");
+        fs::write(&config_path, sample_config()).map_err(|error| {
+            format!(
+                "failed to write sample config {}: {error}",
+                config_path.display()
+            )
+        })?;
+        println!("sample config written to {}", config_path.display());
+        return Ok(Some(CheckTarget::Config(config_path)));
+    }
+
+    let path = PathBuf::from(trimmed);
+    if path.is_dir() {
+        if path.join("openclaw.conf").exists() {
+            Ok(Some(CheckTarget::Profile(path)))
+        } else {
+            Err(format!(
+                "no openclaw.conf was found under {}",
+                path.display()
+            ))
+        }
+    } else {
+        Ok(Some(CheckTarget::Config(path)))
+    }
 }
 
 fn discover_profile_dir() -> Result<PathBuf, String> {
@@ -561,7 +776,7 @@ fn discover_profile_under_roots(roots: Vec<PathBuf>, max_depth: usize) -> Result
     }
 
     Err(
-        "could not auto-discover an OpenClaw profile; use --path <dir> or --config <path>"
+        "could not auto-discover an OpenClaw profile. If OpenClaw is installed elsewhere, rerun with --path <dir> or --config <path>. For a local demo, run `clawguard sample-config --output openclaw.conf` first."
             .to_string(),
     )
 }
@@ -602,7 +817,17 @@ fn search_profile_dir(root: &Path, depth: usize) -> Result<Option<PathBuf>, Stri
 }
 
 fn prompt_for_confirmation(prompt: &str) -> Result<(), String> {
-    print!("{prompt}? [y/N] ");
+    let input = prompt_line(&format!("{prompt}? [y/N]"))?;
+
+    if matches!(input.trim().to_ascii_lowercase().as_str(), "y" | "yes") {
+        Ok(())
+    } else {
+        Err("operation cancelled".to_string())
+    }
+}
+
+fn prompt_line(prompt: &str) -> Result<String, String> {
+    print!("{prompt} ");
     io::stdout()
         .flush()
         .map_err(|error| format!("failed to flush stdout: {error}"))?;
@@ -610,13 +835,8 @@ fn prompt_for_confirmation(prompt: &str) -> Result<(), String> {
     let mut input = String::new();
     io::stdin()
         .read_line(&mut input)
-        .map_err(|error| format!("failed to read confirmation: {error}"))?;
-
-    if matches!(input.trim().to_ascii_lowercase().as_str(), "y" | "yes") {
-        Ok(())
-    } else {
-        Err("operation cancelled".to_string())
-    }
+        .map_err(|error| format!("failed to read input: {error}"))?;
+    Ok(input)
 }
 
 fn render_report(
@@ -664,7 +884,10 @@ fn print_usage(locale: Locale) {
     println!();
     println!("ClawGuard CLI");
     println!();
+    println!("Run `clawguard` without arguments to start interactive mode.");
+    println!();
     println!("Commands:");
+    println!("  interactive");
     println!("  check [--path <dir> | --config <path>] [--rules <path> | --rules-store <path>] [--format json|html|text] [--locale en|zh-CN] [--output <path>]");
     println!("  fix [--path <dir> | --config <path>] [--locale en|zh-CN] [--output <path> | --in-place] [--yes]");
     println!("  remove [--locale en|zh-CN] [--install-dir <path>] [--yes]");

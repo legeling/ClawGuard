@@ -123,6 +123,14 @@ cargo run -p clawguard -- check
 
 `check` now prints the discovered `profile_path` and a `local_probe` result before the report body.
 
+Run the interactive operator flow:
+
+```bash
+cargo run -p clawguard --
+```
+
+With no arguments, ClawGuard now starts an interactive menu for check, fix, remove, and sample-config flows.
+
 Auto-discover a local config and harden it in place:
 
 ```bash

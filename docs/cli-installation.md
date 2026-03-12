@@ -38,6 +38,14 @@ It also prints the discovered `profile_path` and a `local_probe` result before t
 `fix` auto-discovers `openclaw.conf`, hardens it in place by default, and writes a backup first.
 `remove` auto-detects common install directories such as `~/.local/bin` and `~/.cargo/bin`.
 
+For the default operator experience, run ClawGuard without arguments:
+
+```bash
+clawguard
+```
+
+This starts an interactive menu so users can choose check, fix, remove, or sample-config flows without remembering flags.
+
 ## 3. Install Into Cargo Bin
 
 ```bash

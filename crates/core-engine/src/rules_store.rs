@@ -387,7 +387,7 @@ fn hex_char(value: u8) -> char {
 
 fn decode_hex(input: &str) -> Result<Vec<u8>, String> {
     let trimmed = input.trim();
-    if trimmed.len() % 2 != 0 {
+    if !trimmed.len().is_multiple_of(2) {
         return Err("hex input must have an even number of characters".to_string());
     }
 
