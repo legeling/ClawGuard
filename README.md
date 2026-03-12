@@ -37,10 +37,28 @@ Generate a sample configuration:
 cargo run -p openclaw-guard -- sample-config --output example.conf
 ```
 
+Generate a sample ruleset:
+
+```bash
+cargo run -p openclaw-guard -- sample-rules --output rules/default.rules
+```
+
 Scan a configuration:
 
 ```bash
 cargo run -p openclaw-guard -- scan --config example.conf --format json
+```
+
+Scan with a custom ruleset:
+
+```bash
+cargo run -p openclaw-guard -- scan --config example.conf --rules rules/default.rules
+```
+
+Scan a deployment directory:
+
+```bash
+cargo run -p openclaw-guard -- scan-profile --path /path/to/openclaw-profile --format html --output report.html
 ```
 
 Apply hardening to a new output file:

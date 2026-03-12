@@ -1,6 +1,7 @@
 use openclaw_guard_core::{
-    harden_config_file, load_config, render_report_html, render_report_json, sample_config,
-    scan_config,
+    default_ruleset_text, harden_config_file, load_config, load_ruleset, render_report_html,
+    render_report_json, sample_config, scan_config, scan_config_with_rules, scan_profile_dir,
+    scan_profile_with_rules,
 };
 use std::env;
 use std::fs;
@@ -23,8 +24,10 @@ fn run() -> Result<(), String> {
 
     match command {
         "scan" => run_scan(&args[1..]),
+        "scan-profile" => run_scan_profile(&args[1..]),
         "harden" => run_harden(&args[1..]),
         "sample-config" => run_sample_config(&args[1..]),
+        "sample-rules" => run_sample_rules(&args[1..]),
         "help" | "--help" | "-h" => {
             print_usage();
             Ok(())
@@ -37,9 +40,44 @@ fn run_scan(args: &[String]) -> Result<(), String> {
     let config_path = required_flag(args, "--config")?;
     let format = optional_flag(args, "--format").unwrap_or_else(|| "json".to_string());
     let output = optional_flag(args, "--output");
+    let rules_path = optional_flag(args, "--rules");
 
     let config = load_config(&PathBuf::from(config_path))?;
-    let report = scan_config(&config);
+    let report = if let Some(path) = rules_path {
+        let rules = load_ruleset(&PathBuf::from(path))?;
+        scan_config_with_rules(&config, &rules)
+    } else {
+        scan_config(&config)
+    };
+    let rendered = match format.as_str() {
+        "json" => render_report_json(&report),
+        "html" => render_report_html(&report),
+        _ => return Err(format!("unsupported format: {format}")),
+    };
+
+    if let Some(path) = output {
+        fs::write(&path, rendered).map_err(|error| format!("failed to write report {path}: {error}"))?;
+        println!("report written to {path}");
+    } else {
+        println!("{rendered}");
+    }
+
+    Ok(())
+}
+
+fn run_scan_profile(args: &[String]) -> Result<(), String> {
+    let profile_path = required_flag(args, "--path")?;
+    let format = optional_flag(args, "--format").unwrap_or_else(|| "json".to_string());
+    let output = optional_flag(args, "--output");
+    let rules_path = optional_flag(args, "--rules");
+
+    let report = if let Some(path) = rules_path {
+        let rules = load_ruleset(&PathBuf::from(path))?;
+        scan_profile_with_rules(&PathBuf::from(profile_path), &rules)?
+    } else {
+        scan_profile_dir(&PathBuf::from(profile_path))?
+    };
+
     let rendered = match format.as_str() {
         "json" => render_report_json(&report),
         "html" => render_report_html(&report),
@@ -98,6 +136,14 @@ fn run_sample_config(args: &[String]) -> Result<(), String> {
     Ok(())
 }
 
+fn run_sample_rules(args: &[String]) -> Result<(), String> {
+    let output = required_flag(args, "--output")?;
+    fs::write(&output, default_ruleset_text())
+        .map_err(|error| format!("failed to write sample rules {output}: {error}"))?;
+    println!("sample rules written to {output}");
+    Ok(())
+}
+
 fn required_flag(args: &[String], flag: &str) -> Result<String, String> {
     optional_flag(args, flag).ok_or_else(|| format!("missing required flag {flag}"))
 }
@@ -113,6 +159,8 @@ fn print_usage() {
     println!();
     println!("Commands:");
     println!("  scan --config <path> [--format json|html] [--output <path>]");
+    println!("  scan-profile --path <dir> [--format json|html] [--output <path>]");
     println!("  harden --config <path> (--output <path> | --in-place)");
     println!("  sample-config --output <path>");
+    println!("  sample-rules --output <path>");
 }

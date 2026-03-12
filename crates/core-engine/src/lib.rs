@@ -76,6 +76,13 @@ pub struct ScanReport {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Ruleset {
+    pub trusted_origins: Vec<String>,
+    pub suspicious_skill_patterns: Vec<String>,
+    pub weak_tokens: Vec<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HardenOutcome {
     pub backup_path: Option<PathBuf>,
     pub output_path: PathBuf,
@@ -230,6 +237,53 @@ impl OpenClawConfig {
     }
 }
 
+impl Default for Ruleset {
+    fn default() -> Self {
+        Self {
+            trusted_origins: vec![
+                "official".to_string(),
+                "signed-release".to_string(),
+                "managed-package".to_string(),
+            ],
+            suspicious_skill_patterns: vec![
+                "wallet".to_string(),
+                "crypto".to_string(),
+                "exfil".to_string(),
+                "shell".to_string(),
+            ],
+            weak_tokens: vec!["default-token".to_string(), "changeme".to_string()],
+        }
+    }
+}
+
+impl Ruleset {
+    pub fn parse(input: &str) -> Result<Self, String> {
+        let mut ruleset = Self::default();
+
+        for (index, raw_line) in input.lines().enumerate() {
+            let line = raw_line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+
+            let (key, value) = line
+                .split_once('=')
+                .ok_or_else(|| format!("invalid rules line {}: {line}", index + 1))?;
+
+            match key.trim() {
+                "trusted_origins" => ruleset.trusted_origins = parse_list(value.trim()),
+                "suspicious_skill_patterns" => {
+                    ruleset.suspicious_skill_patterns = parse_list(value.trim())
+                }
+                "weak_tokens" => ruleset.weak_tokens = parse_list(value.trim()),
+                _ => return Err(format!("unknown rules key '{}' on line {}", key.trim(), index + 1)),
+            }
+        }
+
+        Ok(ruleset)
+    }
+}
+
 pub fn load_config(path: &Path) -> Result<OpenClawConfig, String> {
     let content = fs::read_to_string(path)
         .map_err(|error| format!("failed to read {}: {error}", path.display()))?;
@@ -246,6 +300,114 @@ pub fn sample_config() -> String {
 }
 
 pub fn scan_config(config: &OpenClawConfig) -> ScanReport {
+    scan_config_with_rules(config, &Ruleset::default())
+}
+
+pub fn load_ruleset(path: &Path) -> Result<Ruleset, String> {
+    let content = fs::read_to_string(path)
+        .map_err(|error| format!("failed to read {}: {error}", path.display()))?;
+    Ruleset::parse(&content)
+}
+
+pub fn default_ruleset_text() -> String {
+    let rules = Ruleset::default();
+    [
+        format!("trusted_origins={}", rules.trusted_origins.join(",")),
+        format!(
+            "suspicious_skill_patterns={}",
+            rules.suspicious_skill_patterns.join(",")
+        ),
+        format!("weak_tokens={}", rules.weak_tokens.join(",")),
+    ]
+    .join("\n")
+}
+
+pub fn scan_profile_dir(path: &Path) -> Result<ScanReport, String> {
+    scan_profile_with_rules(path, &Ruleset::default())
+}
+
+pub fn scan_profile_with_rules(path: &Path, rules: &Ruleset) -> Result<ScanReport, String> {
+    let config_path = path.join("openclaw.conf");
+    let config = load_config(&config_path)?;
+    let mut findings = scan_config_with_rules(&config, rules).findings;
+
+    let env_path = path.join(".env");
+    if env_path.exists() {
+        let env_content = fs::read_to_string(&env_path)
+            .map_err(|error| format!("failed to read {}: {error}", env_path.display()))?;
+        if contains_secret_material(&env_content) {
+            findings.push(Finding {
+                id: "SECR-0002",
+                title: "Secrets are stored in a local environment file",
+                severity: Severity::High,
+                category: Category::Secrets,
+                summary: "A deployment-local .env file contains token or key material.".to_string(),
+                evidence: format!("secret-like values found in {}", env_path.display()),
+                remediation: "Move secrets to a secure store and avoid leaving raw credentials in deployment folders."
+                    .to_string(),
+                auto_fix_supported: false,
+            });
+        }
+    }
+
+    let logs_dir = path.join("logs");
+    if logs_dir.exists() {
+        for log_path in collect_log_files(&logs_dir)? {
+            let log_content = fs::read_to_string(&log_path)
+                .map_err(|error| format!("failed to read {}: {error}", log_path.display()))?;
+            if log_contains_secrets(&log_content) {
+                findings.push(Finding {
+                    id: "SECR-0003",
+                    title: "Log files contain credential material",
+                    severity: Severity::High,
+                    category: Category::Secrets,
+                    summary: "One or more log files appear to contain raw tokens, keys, or auth parameters."
+                        .to_string(),
+                    evidence: format!("secret-like log content found in {}", log_path.display()),
+                    remediation: "Rotate exposed credentials, sanitize logs, and add log redaction guards."
+                        .to_string(),
+                    auto_fix_supported: false,
+                });
+                break;
+            }
+        }
+    }
+
+    let skills_path = path.join("skills").join("installed.txt");
+    if skills_path.exists() {
+        let skills = fs::read_to_string(&skills_path)
+            .map_err(|error| format!("failed to read {}: {error}", skills_path.display()))?;
+        let installed = skills
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty())
+            .map(ToOwned::to_owned)
+            .collect::<Vec<_>>();
+        let matches = suspicious_skill_matches(&installed, rules);
+        if !matches.is_empty() {
+            findings.push(Finding {
+                id: "SUP-0003",
+                title: "Installed skills match suspicious profile patterns",
+                severity: Severity::Critical,
+                category: Category::SupplyChain,
+                summary: "A local skill manifest contains entries that match suspicious ruleset patterns."
+                    .to_string(),
+                evidence: format!(
+                    "skills manifest {} matched {}",
+                    skills_path.display(),
+                    matches.join(",")
+                ),
+                remediation: "Disable the matched skills and verify their package source and signing chain."
+                    .to_string(),
+                auto_fix_supported: false,
+            });
+        }
+    }
+
+    Ok(build_report(config.profile_name, findings))
+}
+
+pub fn scan_config_with_rules(config: &OpenClawConfig, rules: &Ruleset) -> ScanReport {
     let mut findings = Vec::new();
     let public_bind = is_public_bind(&config.bind_address);
 
@@ -284,7 +446,7 @@ pub fn scan_config(config: &OpenClawConfig) -> ScanReport {
         });
     }
 
-    if token_strength(config.auth_token.as_deref()) < 2 {
+    if token_strength(config.auth_token.as_deref(), rules) < 2 {
         findings.push(Finding {
             id: "AUTH-0001",
             title: "Authentication token is missing or weak",
@@ -293,7 +455,7 @@ pub fn scan_config(config: &OpenClawConfig) -> ScanReport {
             summary: "The deployment does not have a strong authentication token.".to_string(),
             evidence: format!(
                 "auth_token_strength={}",
-                token_strength(config.auth_token.as_deref())
+                token_strength(config.auth_token.as_deref(), rules)
             ),
             remediation: "Generate a token with at least 24 characters and rotate any default value."
                 .to_string(),
@@ -381,7 +543,8 @@ pub fn scan_config(config: &OpenClawConfig) -> ScanReport {
         });
     }
 
-    if !config.suspicious_skills.is_empty() {
+    let matched_skills = suspicious_skill_matches(&config.suspicious_skills, rules);
+    if !matched_skills.is_empty() {
         findings.push(Finding {
             id: "SUP-0001",
             title: "Suspicious skills are installed",
@@ -389,7 +552,7 @@ pub fn scan_config(config: &OpenClawConfig) -> ScanReport {
             category: Category::SupplyChain,
             summary: "The deployment lists skills that should be disabled or reviewed immediately."
                 .to_string(),
-            evidence: format!("suspicious_skills={}", config.suspicious_skills.join(",")),
+            evidence: format!("suspicious_skills={}", matched_skills.join(",")),
             remediation: "Disable the listed skills and verify their provenance before re-enabling."
                 .to_string(),
             auto_fix_supported: true,
@@ -397,7 +560,7 @@ pub fn scan_config(config: &OpenClawConfig) -> ScanReport {
     }
 
     if let Some(origin) = &config.installer_origin {
-        if !is_trusted_origin(origin) {
+        if !is_trusted_origin(origin, rules) {
             findings.push(Finding {
                 id: "SUP-0002",
                 title: "Installer or package origin is not trusted",
@@ -413,17 +576,7 @@ pub fn scan_config(config: &OpenClawConfig) -> ScanReport {
         }
     }
 
-    let total_weight: u16 = findings
-        .iter()
-        .map(|finding| u16::from(finding.severity.weight()))
-        .sum();
-    let risk_score = 100u8.saturating_sub(total_weight.min(95) as u8);
-
-    ScanReport {
-        profile_name: config.profile_name.clone(),
-        findings,
-        risk_score,
-    }
+    build_report(config.profile_name.clone(), findings)
 }
 
 pub fn render_report_json(report: &ScanReport) -> String {
@@ -569,7 +722,7 @@ pub fn harden_config(config: &OpenClawConfig) -> (OpenClawConfig, Vec<String>, V
         applied.push("Restricted bind_address to 127.0.0.1".to_string());
     }
 
-    if token_strength(hardened.auth_token.as_deref()) < 2 {
+    if token_strength(hardened.auth_token.as_deref(), &Ruleset::default()) < 2 {
         hardened.auth_token = Some(generate_token());
         applied.push("Rotated authentication token".to_string());
     }
@@ -624,7 +777,7 @@ pub fn harden_config(config: &OpenClawConfig) -> (OpenClawConfig, Vec<String>, V
     }
 
     if let Some(origin) = &hardened.installer_origin {
-        if !is_trusted_origin(origin) {
+        if !is_trusted_origin(origin, &Ruleset::default()) {
             manual.push(
                 "Reinstall from an official signed release channel and verify package provenance."
                     .to_string(),
@@ -653,11 +806,25 @@ fn parse_list(value: &str) -> Vec<String> {
         .collect()
 }
 
-fn token_strength(token: Option<&str>) -> u8 {
+fn build_report(profile_name: String, findings: Vec<Finding>) -> ScanReport {
+    let total_weight: u16 = findings
+        .iter()
+        .map(|finding| u16::from(finding.severity.weight()))
+        .sum();
+    let risk_score = 100u8.saturating_sub(total_weight.min(95) as u8);
+
+    ScanReport {
+        profile_name,
+        findings,
+        risk_score,
+    }
+}
+
+fn token_strength(token: Option<&str>, rules: &Ruleset) -> u8 {
     match token {
         None => 0,
         Some("") => 0,
-        Some(value) if value == "default-token" || value == "changeme" => 1,
+        Some(value) if rules.weak_tokens.iter().any(|item| item == value) => 1,
         Some(value) if value.len() < 24 => 1,
         Some(_) => 2,
     }
@@ -667,8 +834,50 @@ fn is_public_bind(address: &str) -> bool {
     !matches!(address, "127.0.0.1" | "::1" | "localhost")
 }
 
-fn is_trusted_origin(origin: &str) -> bool {
-    matches!(origin, "official" | "signed-release" | "managed-package")
+fn suspicious_skill_matches(skills: &[String], rules: &Ruleset) -> Vec<String> {
+    skills
+        .iter()
+        .filter(|skill| {
+            let normalized = skill.to_ascii_lowercase();
+            rules
+                .suspicious_skill_patterns
+                .iter()
+                .any(|pattern| normalized.contains(&pattern.to_ascii_lowercase()))
+        })
+        .cloned()
+        .collect()
+}
+
+fn is_trusted_origin(origin: &str, rules: &Ruleset) -> bool {
+    rules.trusted_origins.iter().any(|item| item == origin)
+}
+
+fn contains_secret_material(content: &str) -> bool {
+    let upper = content.to_ascii_uppercase();
+    upper.contains("TOKEN=") || upper.contains("SECRET=") || upper.contains("_KEY=")
+}
+
+fn log_contains_secrets(content: &str) -> bool {
+    let lower = content.to_ascii_lowercase();
+    lower.contains("auth_token=") || lower.contains("api_key=") || lower.contains("secret=")
+}
+
+fn collect_log_files(path: &Path) -> Result<Vec<PathBuf>, String> {
+    let mut files = Vec::new();
+    let entries = fs::read_dir(path)
+        .map_err(|error| format!("failed to read {}: {error}", path.display()))?;
+
+    for entry in entries {
+        let entry = entry.map_err(|error| format!("failed to read log entry: {error}"))?;
+        let file_type = entry
+            .file_type()
+            .map_err(|error| format!("failed to read file type: {error}"))?;
+        if file_type.is_file() {
+            files.push(entry.path());
+        }
+    }
+
+    Ok(files)
 }
 
 fn json_escape(input: &str) -> String {
