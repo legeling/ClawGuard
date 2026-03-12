@@ -57,5 +57,8 @@ jobs:
       - name: Validate npm Wrapper Logic
         run: node packages/npm/clawguard/scripts/test-install.js
 
+      - name: Validate Release Signing Logic
+        run: node scripts/test-release-package.js
+
       - name: Build Release Package
         run: VERSION=0.1.0-ci bash scripts/package-release.sh

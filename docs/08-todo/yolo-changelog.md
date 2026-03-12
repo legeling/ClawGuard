@@ -203,3 +203,32 @@
   - Release artifact signing
   - Online trusted rules updates
   - Deeper process and public reachability detection
+
+## Round 8 - 2026-03-12
+
+**PM Score:** 9.2/10  
+**Tests:** 23 passed / 0 failed / 0 skipped  
+**Lint:** 0 errors
+
+### Changes
+
+1. **[Security] Add signed release manifest generation** (`R8-01`) ✅
+   - Problem: release packages could be built, but there was no signed metadata proving the archive checksum and package identity.
+   - Change: `scripts/package-release.sh` now supports signed `.sig` manifest generation, optional local build skipping for packaging tests, and a committed release public key anchor.
+   - Verification: `node scripts/test-release-package.js` passes and confirms the package script emits signed release metadata.
+
+2. **[Security] Verify release manifests during curl and npm installs** (`R8-02`) ✅
+   - Problem: even a signed archive is not useful if installers do not verify it before extraction.
+   - Change: the curl installer now verifies archive name, requested version, SHA-256 checksum, and signature with OpenSSL; the npm wrapper verifies the same manifest with Node crypto before extraction.
+   - Verification: npm install-library tests pass for manifest parsing and signature verification, and shell scripts remain syntax-clean.
+
+3. **[Operations] Enforce release signing in CI and document the signing secret** (`R8-03`) ✅
+   - Problem: the signing workflow could still be bypassed by CI or forgotten during publishing.
+   - Change: CI now validates release signing logic, the release workflow requires `RELEASE_SIGNING_PRIVATE_KEY`, and docs now describe the signed release chain and required repository secret.
+   - Verification: `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, `node packages/npm/clawguard/scripts/test-install.js`, and `node scripts/test-release-package.js` all pass.
+
+### Deferred
+
+- **[Security] Add online trusted rules update workflow** (`R9-01`) -> later
+- **[Function] Add deeper OpenClaw auto-discovery and network reachability checks** (`R9-02`) -> later
+- **[Operations] Publish signed release channels and verify them end to end** (`R9-03`) -> later

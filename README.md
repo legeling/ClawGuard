@@ -90,13 +90,13 @@ Implemented today:
 - localized report output
 - system locale auto-detection
 - signed rules-pack generation, import, activation, and rollback
+- signed release manifest generation and install-time verification
 - ASCII startup banner
 - packaging script and installation guide
 - test coverage for core and CLI flows
 
 Still in progress:
 
-- signed release artifacts
 - online rules-pack update checks
 - published install channels
 - npm wrapper distribution
@@ -208,6 +208,8 @@ Install with `curl` after release archives are published:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/legeling/ClawGuard/main/scripts/install-clawguard.sh | bash
 ```
+
+The installer verifies a signed release manifest against the committed release public key before extracting the archive.
 
 Uninstall the `curl` install:
 

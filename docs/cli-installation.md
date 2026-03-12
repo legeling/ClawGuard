@@ -60,6 +60,13 @@ Once release archives are published, users will be able to install with:
 curl -fsSL https://raw.githubusercontent.com/legeling/ClawGuard/main/scripts/install-clawguard.sh | bash
 ```
 
+The installer downloads the matching `.sig` manifest and verifies:
+
+- archive name
+- requested version
+- SHA-256 checksum
+- Ed25519 signature against `keys/release-public.pem`
+
 Uninstall:
 
 ```bash
@@ -206,7 +213,6 @@ Automatic locale detection:
 
 ## 10. Remaining Packaging Gaps
 
-- Artifact signing is not implemented yet
 - GitHub release archives must be published before `curl` and npm download flows work end-to-end
 - Online rules-pack update checks are not implemented yet
 - npm package is scaffolded but not published yet

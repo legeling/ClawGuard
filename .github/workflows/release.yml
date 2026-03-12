@@ -43,7 +43,14 @@ jobs:
 
       - name: Build Package
         shell: bash
+        env:
+          CLAWGUARD_RELEASE_KEY_ID: github-release
+          CLAWGUARD_RELEASE_PRIVATE_KEY_FILE: ${{ runner.temp }}/release-private.pem
+          CLAWGUARD_REQUIRE_SIGNATURE: "1"
         run: |
+          cat > "${CLAWGUARD_RELEASE_PRIVATE_KEY_FILE}" <<'EOF'
+          ${{ secrets.RELEASE_SIGNING_PRIVATE_KEY }}
+          EOF
           VERSION="${{ steps.version.outputs.value }}" \
           TARGET_TRIPLE="${{ matrix.target_triple }}" \
           bash scripts/package-release.sh
@@ -52,7 +59,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: clawguard-${{ steps.version.outputs.value }}-${{ matrix.target_triple }}
-          path: artifacts/*.tar.gz
+          path: |
+            artifacts/*.tar.gz
+            artifacts/*.sig
 
   publish-github-release:
     name: Publish GitHub Release

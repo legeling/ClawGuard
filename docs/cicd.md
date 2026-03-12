@@ -24,6 +24,7 @@ Tagging a release with `v*` triggers cross-platform release packaging:
 - `x86_64-pc-windows-msvc`
 
 Artifacts are uploaded and attached to the GitHub Release as `.tar.gz` archives.
+When `RELEASE_SIGNING_PRIVATE_KEY` is configured, each archive is accompanied by a signed `.sig` manifest.
 
 Workflow:
 
@@ -43,10 +44,12 @@ Workflow:
 ## Required Repository Secrets
 
 - `NPM_TOKEN`: npm publish token
+- `RELEASE_SIGNING_PRIVATE_KEY`: Ed25519 PKCS#8 private key that matches `keys/release-public.pem`
 
 ## Release Checklist
 
 1. Ensure CI is green
 2. Create and push a tag like `v0.1.0`
-3. Confirm GitHub Release artifacts are attached
-4. Confirm npm publish succeeded if npm distribution is desired
+3. Confirm `.tar.gz` and `.sig` release artifacts are attached
+4. Confirm the install flows can verify the signed manifest against `keys/release-public.pem`
+5. Confirm npm publish succeeded if npm distribution is desired

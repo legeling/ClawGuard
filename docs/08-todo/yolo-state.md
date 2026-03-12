@@ -3,9 +3,9 @@
 requirement: "Build Clawguard end-to-end from requirements to implementation"
 mode: evolve
 started: 2026-03-12
-current_round: 7
+current_round: 8
 max_rounds: 10
-total_improvements: 19
+total_improvements: 22
 status: done
 
 toolchain:
@@ -77,8 +77,9 @@ conductor:
   failure_patterns:
     - "CLI integration tests initially assumed Cargo would inject a binary path env var in this workspace layout."
     - "Adding cryptographic signing required fetching new crates, so workspace verification now depends on network-enabled dependency resolution."
+    - "Release verification spans bash, Node, and GitHub Actions, so a change in one layer can silently desynchronize the others without explicit packaging tests."
   efficiency: "high"
-  strategy: "Stop after the CLI reaches a practical single-host operator baseline: auto-discovery, one-command flows, signed rules lifecycle, and basic live reachability hints."
+  strategy: "Continue hardening the release path so the security tool ships trustworthy artifacts, then pause on a clean checkpoint for publishing and repo positioning."
 
 rounds:
   - round: 0
@@ -263,20 +264,52 @@ rounds:
         files_changed:
           - "README.md"
           - "docs/cli-installation.md"
+  - round: 8
+    test_summary: "23 passed, 0 failed, 0 skipped"
+    lint_errors: 0
+    pm_score: 9.2
+    improvements:
+      - id: R8-01
+        dimension: "security"
+        title: "Add signed release manifest generation"
+        status: done
+        files_changed:
+          - "scripts/package-release.sh"
+          - "keys/release-public.pem"
+          - "scripts/test-release-package.js"
+      - id: R8-02
+        dimension: "security"
+        title: "Verify release manifests during curl and npm installs"
+        status: done
+        files_changed:
+          - "scripts/install-clawguard.sh"
+          - "packages/npm/clawguard/scripts/install-lib.js"
+          - "packages/npm/clawguard/scripts/test-install.js"
+          - "packages/npm/clawguard/README.md"
+      - id: R8-03
+        dimension: "operations"
+        title: "Enforce release signing in CI and document the signing secret"
+        status: done
+        files_changed:
+          - ".github/workflows/ci.yml"
+          - ".github/workflows/release.yml"
+          - "docs/cicd.md"
+          - "README.md"
+          - "docs/cli-installation.md"
 
 deferred_issues:
-  - id: R8-01
-    title: "Add artifact signing and verification workflow"
-    impact: 5
-    reason: "Packaging exists, but release artifacts and rules packs are not signed yet."
-  - id: R8-02
+  - id: R9-01
     title: "Add online trusted rules update workflow"
     impact: 5
     reason: "Rules packs can be signed and imported locally, but there is no online update check, trusted keyring, or staged download flow."
-  - id: R8-03
+  - id: R9-02
     title: "Add deeper OpenClaw auto-discovery and network reachability checks"
     impact: 4
     reason: "Local profile auto-discovery now exists, but the product still lacks process, port, and public reachability detection."
+  - id: R9-03
+    title: "Publish signed release channels and verify them end to end"
+    impact: 4
+    reason: "The signing workflow is implemented, but it still needs a real repository secret, published artifacts, and a smoke-tested release run."
 
 failure_lessons:
   - round: 1
@@ -304,6 +337,11 @@ failure_lessons:
     failure_type: "test_environment"
     description: "The sandbox does not permit binding a test TCP listener, so a positive probe test could not rely on a real local socket."
     takeaway: "Keep the production probe real, but let tests override probe results through a dedicated environment hook when sandbox networking is restricted."
+  - round: 8
+    improvement_id: "R8-01"
+    failure_type: "integration_gap"
+    description: "The release signing feature initially lacked a packaging-level regression test, which would have allowed the shell script, npm verifier, and workflow expectations to drift apart."
+    takeaway: "For cross-layer release logic, add a dedicated package-level test before touching the implementation."
 
 round_decisions:
   - round: 1
@@ -320,3 +358,5 @@ round_decisions:
     note: "Prioritized check/fix/remove because the product needed user-facing command ergonomics more than additional low-level subcommands."
   - round: 7
     note: "Stopped after recursive discovery and local probe reporting because the CLI now satisfies the single-host operator workflow that drove this iteration."
+  - round: 8
+    note: "Resumed to harden the release supply chain, then paused again on a publish-ready checkpoint."
