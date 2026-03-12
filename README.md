@@ -11,6 +11,7 @@ Canonical project documents live in `docs/`:
 - `docs/openclaw-security-insights.md`
 - `docs/openclaw-guard-requirements.md`
 - `docs/openclaw-guard-architecture.md`
+- `docs/cli-installation.md`
 - `docs/documentation-management.md`
 - `docs/vulnerability-tracker.md`
 
@@ -45,6 +46,12 @@ Scan a configuration:
 
 ```bash
 cargo run -p clawguard -- scan --config example.conf --format json
+```
+
+Scan with localized text output:
+
+```bash
+cargo run -p clawguard -- scan --config example.conf --format text --locale zh-CN
 ```
 
 Scan with a custom ruleset:

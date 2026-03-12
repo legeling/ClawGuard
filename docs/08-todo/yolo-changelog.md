@@ -76,3 +76,31 @@
 
 - **[Packaging] Add release packaging and install workflow** (`R4-01`) -> next round
 - **[Security] Add signed update and rules-pack verification workflow** (`R4-02`) -> next round
+
+## Round 4 - 2026-03-12
+
+**PM Score:** 8.1/10  
+**Tests:** 11 passed / 0 failed / 0 skipped  
+**Lint:** 0 errors
+
+### Changes
+
+1. **[Test] Add test-first locale coverage** (`R4-01`) ✅
+   - Problem: multi-language support was only a documented direction and had no regression coverage.
+   - Change: added failing tests for localized text reports and CLI locale selection before implementing the feature.
+   - Verification: localized core and CLI tests now pass.
+
+2. **[Function] Implement locale-aware CLI and reports** (`R4-02`) ✅
+   - Problem: the CLI still emitted English-only output even though report localization was a stated requirement.
+   - Change: added `Locale`, localized text and HTML rendering, `--locale`, and `--format text` support.
+   - Verification: `cargo test --workspace` passes with locale-specific assertions.
+
+3. **[Operations] Add CLI packaging and installation workflow** (`R4-03`) ✅
+   - Problem: the CLI could be built in development, but there was no documented install path or packaging workflow.
+   - Change: added installation guidance and a release packaging script.
+   - Verification: `bash -n scripts/package-release.sh` passes and the script is executable.
+
+### Deferred
+
+- **[Security] Add artifact signing and verification workflow** (`R5-01`) -> next round
+- **[Security] Add signed update and rules-pack verification workflow** (`R5-02`) -> next round

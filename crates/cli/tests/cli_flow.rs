@@ -120,3 +120,29 @@ fn scan_profile_reports_artifact_findings() {
 
     let _ = fs::remove_dir_all(root);
 }
+
+#[test]
+fn localized_text_scan_uses_requested_locale() {
+    let bin = cli_bin_path();
+    let config_path = temp_path("localized.conf");
+
+    fs::write(
+        &config_path,
+        "profile_name=edge\nbind_address=0.0.0.0\nport=18789\ntls_enabled=false\nauth_token=changeme\nsource_allowlist=\nwebhook_enabled=false\nwebhook_public_key=\napproval_preview_consistent=true\ncommand_allowlist_normalized=true\ndebug_enabled=false\nskills_status_exposes_secrets=false\nsuspicious_skills=\ninstaller_origin=official",
+    )
+    .expect("config should be written");
+
+    let scan = Command::new(&bin)
+        .args(["scan", "--config"])
+        .arg(&config_path)
+        .args(["--format", "text", "--locale", "zh-CN"])
+        .output()
+        .expect("localized scan should run");
+    assert!(scan.status.success());
+
+    let stdout = String::from_utf8(scan.stdout).expect("stdout should be valid utf-8");
+    assert!(stdout.contains("风险评分"));
+    assert!(stdout.contains("发现项"));
+
+    let _ = fs::remove_file(config_path);
+}

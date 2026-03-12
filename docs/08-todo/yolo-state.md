@@ -3,9 +3,9 @@
 requirement: "Build Clawguard end-to-end from requirements to implementation"
 mode: evolve
 started: 2026-03-12
-current_round: 3
+current_round: 4
 max_rounds: 10
-total_improvements: 6
+total_improvements: 8
 status: running
 
 toolchain:
@@ -138,13 +138,40 @@ rounds:
           - "docs/openclaw-guard-architecture.md"
           - "docs/openclaw-security-insights.md"
           - "docs/09-issues/active/cli-packaging-distribution.md"
+  - round: 4
+    test_summary: "11 passed, 0 failed, 0 skipped"
+    lint_errors: 0
+    pm_score: 8.1
+    improvements:
+      - id: R4-01
+        dimension: "test"
+        title: "Add test-first locale coverage"
+        status: done
+        files_changed:
+          - "crates/core-engine/tests/localization.rs"
+          - "crates/cli/tests/cli_flow.rs"
+      - id: R4-02
+        dimension: "function"
+        title: "Implement locale-aware CLI and reports"
+        status: done
+        files_changed:
+          - "crates/core-engine/src/lib.rs"
+          - "crates/cli/src/main.rs"
+      - id: R4-03
+        dimension: "operations"
+        title: "Add CLI packaging and installation workflow"
+        status: done
+        files_changed:
+          - "docs/cli-installation.md"
+          - "scripts/package-release.sh"
+          - "README.md"
 
 deferred_issues:
-  - id: R4-01
-    title: "Add release packaging and install workflow"
+  - id: R5-01
+    title: "Add artifact signing and verification workflow"
     impact: 5
-    reason: "The scanner works as a development binary, but CLI packaging and distribution are not finalized."
-  - id: R4-02
+    reason: "Packaging exists, but release artifacts and rules packs are not signed yet."
+  - id: R5-02
     title: "Add signed update and rules-pack verification workflow"
     impact: 5
     reason: "Rules are extensible but not yet packaged or signature-verified."
@@ -155,6 +182,11 @@ failure_lessons:
     failure_type: "test_failure"
     description: "CLI integration tests assumed a compile-time cargo binary environment variable."
     takeaway: "Infer the test binary path from current_exe or use a runtime-provided path instead of compile-time macros."
+  - round: 4
+    improvement_id: "R4-02"
+    failure_type: "lint_error"
+    description: "Locale support introduced a Clippy lifetime warning and an unused import during the green phase."
+    takeaway: "Treat lint as part of the TDD verify step and keep CLI imports minimal after refactors."
 
 round_decisions:
   - round: 1
@@ -163,3 +195,5 @@ round_decisions:
     note: "Prioritized real deployment directory scanning because config-only scanning was too narrow for the documented requirements."
   - round: 3
     note: "The product direction is now explicitly CLI-only, so desktop and frontend work was removed from the active roadmap."
+  - round: 4
+    note: "Prioritized locale-aware output and packaging because the MVP was runnable but still weak on operator usability and distribution."

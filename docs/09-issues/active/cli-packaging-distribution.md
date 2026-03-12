@@ -14,12 +14,15 @@ The product direction is now CLI-only. The remaining gap is distribution: a user
 - CLI entry point: implemented
 - Ruleset loading: implemented
 - Deployment profile scanning: implemented
-- Release packaging: pending
-- Installation workflow: pending
+- Localized report output: implemented
+- Release packaging script: implemented
+- Installation workflow documentation: implemented
+- Artifact signing: pending
+- Published install channels: pending
 
 ## Next Actions
 
 1. Define release artifact targets for macOS, Linux, and Windows
-2. Add installation instructions and a release checklist
-3. Add sample packaged rules and report templates
+2. Add artifact signing and verification workflow
+3. Add published install channels and release notes process
 4. Add a packaging-specific milestone to the changelog and state tracker

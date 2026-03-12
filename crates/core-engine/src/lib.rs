@@ -56,6 +56,29 @@ impl fmt::Display for Category {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Locale {
+    En,
+    ZhCn,
+}
+
+impl Locale {
+    pub fn parse(input: &str) -> Option<Self> {
+        match input {
+            "en" | "en-US" => Some(Self::En),
+            "zh-CN" | "zh" => Some(Self::ZhCn),
+            _ => None,
+        }
+    }
+
+    fn lang_attr(&self) -> &'static str {
+        match self {
+            Self::En => "en",
+            Self::ZhCn => "zh-CN",
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Finding {
     pub id: &'static str,
@@ -620,16 +643,24 @@ pub fn render_report_json(report: &ScanReport) -> String {
 }
 
 pub fn render_report_html(report: &ScanReport) -> String {
+    render_report_html_with_locale(report, Locale::En)
+}
+
+pub fn render_report_html_with_locale(report: &ScanReport, locale: Locale) -> String {
+    let labels = labels_for(locale);
     let rows = report
         .findings
         .iter()
         .map(|finding| {
             format!(
-                "<article class=\"finding\"><header><span class=\"severity {severity}\">{severity}</span><h2>{title}</h2></header><p>{summary}</p><p><strong>Evidence:</strong> {evidence}</p><p><strong>Remediation:</strong> {remediation}</p></article>",
-                severity = finding.severity,
-                title = html_escape(finding.title),
+                "<article class=\"finding\"><header><span class=\"severity {severity_class}\">{severity}</span><h2>{title}</h2></header><p>{summary}</p><p><strong>{evidence_label}:</strong> {evidence}</p><p><strong>{remediation_label}:</strong> {remediation}</p></article>",
+                severity_class = finding.severity,
+                severity = localized_severity(&finding.severity, locale),
+                title = html_escape(localized_finding_title(finding, locale)),
                 summary = html_escape(&finding.summary),
+                evidence_label = labels.evidence,
                 evidence = html_escape(&finding.evidence),
+                remediation_label = labels.remediation,
                 remediation = html_escape(&finding.remediation)
             )
         })
@@ -638,8 +669,8 @@ pub fn render_report_html(report: &ScanReport) -> String {
 
     format!(
         concat!(
-            "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">",
-            "<title>Clawguard Report</title>",
+            "<!doctype html><html lang=\"{lang}\"><head><meta charset=\"utf-8\">",
+            "<title>{title}</title>",
             "<style>",
             "body{{font-family:Georgia,serif;background:#f4f0e8;color:#1f2933;margin:0;padding:32px;}}",
             ".hero{{background:linear-gradient(135deg,#0f4c5c,#e36414);color:#fff;padding:24px;border-radius:18px;margin-bottom:24px;}}",
@@ -653,15 +684,56 @@ pub fn render_report_html(report: &ScanReport) -> String {
             ".low{{background:#166534;color:#dcfce7;}}",
             "h1,h2{{margin:0 0 12px 0;}}",
             "</style></head><body>",
-            "<section class=\"hero\"><h1>Clawguard Report</h1><p>Profile: {profile}</p>",
-            "<div class=\"metrics\"><div class=\"metric\">Risk Score: {score}</div><div class=\"metric\">Findings: {count}</div></div></section>",
+            "<section class=\"hero\"><h1>{title}</h1><p>{profile_label}: {profile}</p>",
+            "<div class=\"metrics\"><div class=\"metric\">{risk_score_label}: {score}</div><div class=\"metric\">{findings_label}: {count}</div></div></section>",
             "{rows}",
             "</body></html>"
         ),
+        lang = locale.lang_attr(),
+        title = labels.report_title,
+        profile_label = labels.profile,
         profile = html_escape(&report.profile_name),
+        risk_score_label = labels.risk_score,
         score = report.risk_score,
+        findings_label = labels.findings,
         count = report.findings.len(),
         rows = rows
+    )
+}
+
+pub fn render_report_text_with_locale(report: &ScanReport, locale: Locale) -> String {
+    let labels = labels_for(locale);
+    let findings = report
+        .findings
+        .iter()
+        .enumerate()
+        .map(|(index, finding)| {
+            format!(
+                "{n}. [{severity}] {title}\n   {summary_label}: {summary}\n   {evidence_label}: {evidence}\n   {remediation_label}: {remediation}",
+                n = index + 1,
+                severity = localized_severity(&finding.severity, locale),
+                title = localized_finding_title(finding, locale),
+                summary_label = labels.summary,
+                summary = finding.summary,
+                evidence_label = labels.evidence,
+                evidence = finding.evidence,
+                remediation_label = labels.remediation,
+                remediation = finding.remediation
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    format!(
+        "{title}\n{profile_label}: {profile}\n{risk_score_label}: {score}\n{findings_label}: {count}\n\n{finding_lines}",
+        title = labels.report_title,
+        profile_label = labels.profile,
+        profile = report.profile_name,
+        risk_score_label = labels.risk_score,
+        score = report.risk_score,
+        findings_label = labels.findings,
+        count = report.findings.len(),
+        finding_lines = findings
     )
 }
 
@@ -893,6 +965,78 @@ fn html_escape(input: &str) -> String {
         .replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('"', "&quot;")
+}
+
+struct ReportLabels {
+    report_title: &'static str,
+    profile: &'static str,
+    risk_score: &'static str,
+    findings: &'static str,
+    summary: &'static str,
+    evidence: &'static str,
+    remediation: &'static str,
+}
+
+fn labels_for(locale: Locale) -> ReportLabels {
+    match locale {
+        Locale::En => ReportLabels {
+            report_title: "Clawguard Report",
+            profile: "Profile",
+            risk_score: "Risk Score",
+            findings: "Findings",
+            summary: "Summary",
+            evidence: "Evidence",
+            remediation: "Remediation",
+        },
+        Locale::ZhCn => ReportLabels {
+            report_title: "Clawguard 安全报告",
+            profile: "配置档案",
+            risk_score: "风险评分",
+            findings: "发现项",
+            summary: "摘要",
+            evidence: "证据",
+            remediation: "修复建议",
+        },
+    }
+}
+
+fn localized_severity(severity: &Severity, locale: Locale) -> &'static str {
+    match locale {
+        Locale::En => match severity {
+            Severity::Critical => "critical",
+            Severity::High => "high",
+            Severity::Medium => "medium",
+            Severity::Low => "low",
+        },
+        Locale::ZhCn => match severity {
+            Severity::Critical => "严重",
+            Severity::High => "高危",
+            Severity::Medium => "中危",
+            Severity::Low => "低危",
+        },
+    }
+}
+
+fn localized_finding_title(finding: &Finding, locale: Locale) -> &str {
+    match locale {
+        Locale::En => finding.title,
+        Locale::ZhCn => match finding.id {
+            "EXP-0001" => "控制面绑定到了公网接口",
+            "EXP-0002" => "默认控制端口处于公网暴露状态",
+            "AUTH-0001" => "认证令牌缺失或过弱",
+            "AUTH-0002" => "暴露端点未启用 TLS",
+            "AUTH-0003" => "公网服务缺少来源限制",
+            "PERM-0001" => "Webhook 校验可能处于 fail-open",
+            "PERM-0002" => "审批策略与真实执行策略不一致",
+            "SECR-0001" => "调试或状态接口可能泄露敏感信息",
+            "SECR-0002" => "本地环境文件存放了敏感凭证",
+            "SECR-0003" => "日志文件包含凭证内容",
+            "SUP-0001" => "检测到可疑技能",
+            "SUP-0002" => "安装来源不可信",
+            "SUP-0003" => "已安装技能命中可疑规则",
+            _ => finding.title,
+        },
+    }
 }
 
 fn generate_token() -> String {

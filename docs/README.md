@@ -8,6 +8,7 @@ Chinese can be shipped as an optional UI locale and translated documentation set
 - [Security Insights](./openclaw-security-insights.md)
 - [Product Requirements](./openclaw-guard-requirements.md)
 - [Solution Architecture](./openclaw-guard-architecture.md)
+- [CLI Installation](./cli-installation.md)
 - [Documentation Management](./documentation-management.md)
 - [Vulnerability Tracker](./vulnerability-tracker.md)
 
