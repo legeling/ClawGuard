@@ -40,6 +40,7 @@ Clawguard should be organized into one shared engine and one shell:
    - Non-interactive automation
    - CI and scripting support
    - JSON-first output mode
+   - Localized interactive operator flow with a global locale switch
 
 ## 4. Logical Modules
 
@@ -213,7 +214,8 @@ The project should be English-first:
 
 Implementation expectations:
 
-- Report templates rendered from localized message bundles
+- Report templates and interactive CLI strings rendered from localized message bundles
+- Global locale flags override environment-based locale detection
 - Missing translations fall back to English
 
 ## 10. Documentation Management Design

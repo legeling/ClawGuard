@@ -193,6 +193,23 @@ fn help_shows_banner_and_localized_tagline() {
 }
 
 #[test]
+fn help_respects_explicit_locale_flag() {
+    let bin = cli_bin_path();
+
+    let help = Command::new(&bin)
+        .args(["--help", "--locale", "zh-CN"])
+        .env("LANG", "en_US.UTF-8")
+        .output()
+        .expect("help should run");
+    assert!(help.status.success());
+
+    let stdout = String::from_utf8(help.stdout).expect("stdout should be valid utf-8");
+    assert!(stdout.contains("小龙虾卫士"));
+    assert!(stdout.contains("命令："));
+    assert!(stdout.contains("直接运行 `clawguard` 可进入交互模式。"));
+}
+
+#[test]
 fn no_args_launches_interactive_check_flow() {
     let bin = cli_bin_path();
     let root = temp_path("interactive-check");
@@ -226,6 +243,83 @@ fn no_args_launches_interactive_check_flow() {
     assert!(stdout.contains("Interactive Mode"));
     assert!(stdout.contains("Clawguard Report"));
     assert!(stdout.contains("profile_path="));
+
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn no_args_interactive_flow_uses_chinese_locale() {
+    let bin = cli_bin_path();
+    let root = temp_path("interactive-check-zh");
+
+    fs::create_dir_all(&root).expect("temp root should exist");
+    fs::write(
+        root.join("openclaw.conf"),
+        "profile_name=interactive\nbind_address=127.0.0.1\nport=18789\ntls_enabled=true\nauth_token=abcdefghijklmnopqrstuvwxyz\nsource_allowlist=127.0.0.1/32\nwebhook_enabled=false\nwebhook_public_key=\napproval_preview_consistent=true\ncommand_allowlist_normalized=true\ndebug_enabled=false\nskills_status_exposes_secrets=false\nsuspicious_skills=\ninstaller_origin=official",
+    )
+    .expect("config should be written");
+
+    let mut child = Command::new(&bin)
+        .current_dir(&root)
+        .env("LANG", "zh_CN.UTF-8")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("interactive mode should run");
+
+    let mut stdin = child.stdin.take().expect("stdin should be available");
+    stdin
+        .write_all(b"1\n5\n")
+        .expect("menu choices should be written");
+    drop(stdin);
+
+    let output = child
+        .wait_with_output()
+        .expect("interactive output should be collected");
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be valid utf-8");
+    assert!(stdout.contains("交互模式"));
+    assert!(stdout.contains("扫描本机"));
+    assert!(stdout.contains("风险评分"));
+
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn global_locale_flag_starts_interactive_mode() {
+    let bin = cli_bin_path();
+    let root = temp_path("interactive-check-flag");
+
+    fs::create_dir_all(&root).expect("temp root should exist");
+    fs::write(
+        root.join("openclaw.conf"),
+        "profile_name=interactive\nbind_address=127.0.0.1\nport=18789\ntls_enabled=true\nauth_token=abcdefghijklmnopqrstuvwxyz\nsource_allowlist=127.0.0.1/32\nwebhook_enabled=false\nwebhook_public_key=\napproval_preview_consistent=true\ncommand_allowlist_normalized=true\ndebug_enabled=false\nskills_status_exposes_secrets=false\nsuspicious_skills=\ninstaller_origin=official",
+    )
+    .expect("config should be written");
+
+    let mut child = Command::new(&bin)
+        .args(["--locale", "zh-CN"])
+        .current_dir(&root)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("interactive mode should run");
+
+    let mut stdin = child.stdin.take().expect("stdin should be available");
+    stdin
+        .write_all(b"5\n")
+        .expect("menu choices should be written");
+    drop(stdin);
+
+    let output = child
+        .wait_with_output()
+        .expect("interactive output should be collected");
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be valid utf-8");
+    assert!(stdout.contains("交互模式"));
+    assert!(stdout.contains("扫描本机"));
 
     let _ = fs::remove_dir_all(root);
 }

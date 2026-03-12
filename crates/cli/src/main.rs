@@ -6,7 +6,11 @@ use clawguard_core::{
     sample_config, scan_config, scan_config_with_rules, scan_profile_dir, scan_profile_with_rules,
     write_rules_pack, Locale, OpenClawConfig, Ruleset, ScanReport,
 };
-use dialoguer::{theme::ColorfulTheme, Confirm, Input, MultiSelect};
+use dialoguer::{
+    console::{style, Style},
+    theme::ColorfulTheme,
+    Confirm, Input, MultiSelect,
+};
 use std::env;
 use std::fs;
 use std::io::{self, IsTerminal, Write};
@@ -25,27 +29,28 @@ fn main() {
 fn run() -> Result<(), String> {
     let args = env::args().skip(1).collect::<Vec<_>>();
     let locale = parse_locale(&args)?;
-    let Some(command) = args.first().map(String::as_str) else {
+    let command_args = strip_global_flags(&args);
+    let Some(command) = command_args.first().map(String::as_str) else {
         return run_interactive(locale);
     };
 
     match command {
         "interactive" => run_interactive(locale),
-        "check" => run_check(&args[1..]),
-        "fix" => run_fix(&args[1..]),
-        "remove" => run_remove(&args[1..]),
-        "scan" => run_scan(&args[1..]),
-        "scan-profile" => run_scan_profile(&args[1..]),
-        "harden" => run_harden(&args[1..]),
-        "uninstall" => run_uninstall(&args[1..]),
-        "sample-config" => run_sample_config(&args[1..]),
-        "sample-rules" => run_sample_rules(&args[1..]),
-        "generate-signing-keypair" => run_generate_signing_keypair(&args[1..]),
-        "sign-rules-pack" => run_sign_rules_pack(&args[1..]),
-        "import-rules-pack" => run_import_rules_pack(&args[1..]),
-        "activate-rules" => run_activate_rules(&args[1..]),
-        "rollback-rules" => run_rollback_rules(&args[1..]),
-        "rules-status" => run_rules_status(&args[1..]),
+        "check" => run_check(&command_args[1..], locale),
+        "fix" => run_fix(&command_args[1..], locale),
+        "remove" => run_remove(&command_args[1..], locale),
+        "scan" => run_scan(&command_args[1..], locale),
+        "scan-profile" => run_scan_profile(&command_args[1..], locale),
+        "harden" => run_harden(&command_args[1..], locale),
+        "uninstall" => run_uninstall(&command_args[1..], locale),
+        "sample-config" => run_sample_config(&command_args[1..], locale),
+        "sample-rules" => run_sample_rules(&command_args[1..], locale),
+        "generate-signing-keypair" => run_generate_signing_keypair(&command_args[1..]),
+        "sign-rules-pack" => run_sign_rules_pack(&command_args[1..]),
+        "import-rules-pack" => run_import_rules_pack(&command_args[1..]),
+        "activate-rules" => run_activate_rules(&command_args[1..]),
+        "rollback-rules" => run_rollback_rules(&command_args[1..]),
+        "rules-status" => run_rules_status(&command_args[1..]),
         "help" | "--help" | "-h" => {
             print_usage(locale);
             Ok(())
@@ -54,16 +59,35 @@ fn run() -> Result<(), String> {
     }
 }
 
+fn strip_global_flags(args: &[String]) -> Vec<String> {
+    let mut filtered = Vec::new();
+    let mut index = 0;
+
+    while index < args.len() {
+        if args[index] == "--locale" {
+            index += 1;
+            if index < args.len() {
+                index += 1;
+            }
+            continue;
+        }
+
+        filtered.push(args[index].clone());
+        index += 1;
+    }
+
+    filtered
+}
+
 enum CheckTarget {
     Config(PathBuf),
     Profile(PathBuf),
 }
 
-fn run_scan(args: &[String]) -> Result<(), String> {
+fn run_scan(args: &[String], locale: Locale) -> Result<(), String> {
     let config_path = required_flag(args, "--config")?;
     let format = optional_flag(args, "--format").unwrap_or_else(|| "json".to_string());
     let output = optional_flag(args, "--output");
-    let locale = parse_locale(args)?;
 
     let config = load_config(&PathBuf::from(config_path))?;
     let report = if let Some(rules) = resolve_ruleset_for_scan(args)? {
@@ -75,7 +99,7 @@ fn run_scan(args: &[String]) -> Result<(), String> {
 
     if let Some(path) = output {
         fs::write(&path, rendered).map_err(|error| format!("failed to write report {path}: {error}"))?;
-        println!("report written to {path}");
+        println!("{}", locale_text(locale).report_written(&path));
     } else {
         println!("{rendered}");
     }
@@ -83,20 +107,18 @@ fn run_scan(args: &[String]) -> Result<(), String> {
     Ok(())
 }
 
-fn run_check(args: &[String]) -> Result<(), String> {
+fn run_check(args: &[String], locale: Locale) -> Result<(), String> {
     let format = optional_flag(args, "--format").unwrap_or_else(|| "text".to_string());
     let output = optional_flag(args, "--output");
-    let locale = parse_locale(args)?;
     let rules = resolve_ruleset_for_scan(args)?;
     let target = resolve_check_target(args)?;
     execute_check(target, rules, format, output, locale)
 }
 
-fn run_scan_profile(args: &[String]) -> Result<(), String> {
+fn run_scan_profile(args: &[String], locale: Locale) -> Result<(), String> {
     let profile_path = required_flag(args, "--path")?;
     let format = optional_flag(args, "--format").unwrap_or_else(|| "json".to_string());
     let output = optional_flag(args, "--output");
-    let locale = parse_locale(args)?;
 
     let report = if let Some(rules) = resolve_ruleset_for_scan(args)? {
         scan_profile_with_rules(&PathBuf::from(profile_path), &rules)?
@@ -108,7 +130,7 @@ fn run_scan_profile(args: &[String]) -> Result<(), String> {
 
     if let Some(path) = output {
         fs::write(&path, rendered).map_err(|error| format!("failed to write report {path}: {error}"))?;
-        println!("report written to {path}");
+        println!("{}", locale_text(locale).report_written(&path));
     } else {
         println!("{rendered}");
     }
@@ -116,8 +138,7 @@ fn run_scan_profile(args: &[String]) -> Result<(), String> {
     Ok(())
 }
 
-fn run_fix(args: &[String]) -> Result<(), String> {
-    let locale = parse_locale(args)?;
+fn run_fix(args: &[String], locale: Locale) -> Result<(), String> {
     let config_path = resolve_config_path(args)?;
     let output = optional_flag(args, "--output").map(PathBuf::from);
     let in_place = output.is_none() || args.iter().any(|arg| arg == "--in-place");
@@ -156,11 +177,10 @@ fn run_fix(args: &[String]) -> Result<(), String> {
     Ok(())
 }
 
-fn run_harden(args: &[String]) -> Result<(), String> {
+fn run_harden(args: &[String], locale: Locale) -> Result<(), String> {
     let config_path = required_flag(args, "--config")?;
     let output = optional_flag(args, "--output");
     let in_place = args.iter().any(|arg| arg == "--in-place");
-    let locale = parse_locale(args)?;
 
     if output.is_none() && !in_place {
         return Err("either --output or --in-place must be supplied".to_string());
@@ -192,19 +212,19 @@ fn run_harden(args: &[String]) -> Result<(), String> {
     Ok(())
 }
 
-fn run_sample_config(args: &[String]) -> Result<(), String> {
+fn run_sample_config(args: &[String], locale: Locale) -> Result<(), String> {
     let output = required_flag(args, "--output")?;
     fs::write(&output, sample_config())
         .map_err(|error| format!("failed to write sample config {output}: {error}"))?;
-    println!("sample config written to {output}");
+    println!("{}", locale_text(locale).sample_config_written(&output));
     Ok(())
 }
 
-fn run_sample_rules(args: &[String]) -> Result<(), String> {
+fn run_sample_rules(args: &[String], locale: Locale) -> Result<(), String> {
     let output = required_flag(args, "--output")?;
     fs::write(&output, default_ruleset_text())
         .map_err(|error| format!("failed to write sample rules {output}: {error}"))?;
-    println!("sample rules written to {output}");
+    println!("{}", locale_text(locale).sample_rules_written(&output));
     Ok(())
 }
 
@@ -324,8 +344,7 @@ fn run_rules_status(args: &[String]) -> Result<(), String> {
     Ok(())
 }
 
-fn run_remove(args: &[String]) -> Result<(), String> {
-    let locale = parse_locale(args)?;
+fn run_remove(args: &[String], locale: Locale) -> Result<(), String> {
     let text = locale_text(locale);
     let assume_yes = args.iter().any(|arg| arg == "--yes");
     let install_dir = resolve_install_dir(args)?;
@@ -350,29 +369,38 @@ fn run_interactive(locale: Locale) -> Result<(), String> {
 }
 
 fn run_rich_interactive(locale: Locale) -> Result<(), String> {
-    println!("{}", banner());
+    let text = locale_text(locale);
+    println!("{}", style(banner()).color256(208));
     println!();
-    println!("🛡  ClawGuard Interactive Mode");
-    println!("{}", locale_text(locale).tagline);
-    println!("Use ↑/↓ to move, Space to toggle, and Enter to run.");
+    println!(
+        "{}",
+        style(text.interactive_mode_title)
+            .bold()
+            .color256(208)
+    );
+    println!("{}", style(text.tagline).bold());
+    println!(
+        "{}",
+        style(text.interactive_instructions).color256(214)
+    );
     println!();
 
     loop {
         let selections = MultiSelect::with_theme(&interactive_theme())
-            .with_prompt("Quick Actions")
+            .with_prompt(text.quick_actions)
             .items([
-                "🔎 Check this machine",
-                "🛠 Fix local OpenClaw config",
-                "🗑 Remove installed ClawGuard binary",
-                "🧪 Generate sample config here",
-                "🚪 Exit interactive mode",
+                text.action_check,
+                text.action_fix,
+                text.action_remove,
+                text.action_sample,
+                text.action_exit,
             ])
             .interact()
             .map_err(|error| format!("interactive menu failed: {error}"))?;
 
         if selections.is_empty() {
             if Confirm::with_theme(&interactive_theme())
-                .with_prompt("No action selected. Exit ClawGuard?")
+                .with_prompt(text.no_action_selected_prompt)
                 .default(true)
                 .interact()
                 .map_err(|error| format!("interactive confirmation failed: {error}"))?
@@ -388,7 +416,7 @@ fn run_rich_interactive(locale: Locale) -> Result<(), String> {
                 0 => interactive_check(locale)?,
                 1 => interactive_fix(locale)?,
                 2 => interactive_remove(locale)?,
-                3 => interactive_sample_config()?,
+                3 => interactive_sample_config(locale)?,
                 4 => {}
                 _ => {}
             }
@@ -398,31 +426,32 @@ fn run_rich_interactive(locale: Locale) -> Result<(), String> {
             return Ok(());
         }
 
-        println!("\nCompleted selected action(s).\n");
+        println!("\n{}\n", text.completed_selected_actions);
     }
 }
 
 fn run_text_interactive(locale: Locale) -> Result<(), String> {
+    let text = locale_text(locale);
     println!("{}", banner());
     println!();
-    println!("Interactive Mode");
-    println!("{}", locale_text(locale).tagline);
+    println!("{}", text.interactive_mode_plain_title);
+    println!("{}", text.tagline);
     println!();
 
     loop {
-        println!("1. Check this machine");
-        println!("2. Fix local OpenClaw config");
-        println!("3. Remove installed ClawGuard binary");
-        println!("4. Generate sample config here");
-        println!("5. Exit");
+        println!("1. {}", text.action_check_plain);
+        println!("2. {}", text.action_fix_plain);
+        println!("3. {}", text.action_remove_plain);
+        println!("4. {}", text.action_sample_plain);
+        println!("5. {}", text.action_exit_plain);
 
-        match prompt_line("Choose an action")?.trim() {
+        match prompt_line(text.choose_action_prompt)?.trim() {
             "1" => interactive_check(locale)?,
             "2" => interactive_fix(locale)?,
             "3" => interactive_remove(locale)?,
-            "4" => interactive_sample_config()?,
+            "4" => interactive_sample_config(locale)?,
             "5" | "" => return Ok(()),
-            _ => println!("Unknown choice. Enter 1, 2, 3, 4, or 5."),
+            _ => println!("{}", text.unknown_choice),
         }
 
         println!();
@@ -432,7 +461,7 @@ fn run_text_interactive(locale: Locale) -> Result<(), String> {
 fn interactive_check(locale: Locale) -> Result<(), String> {
     let target = match resolve_check_target(&[]) {
         Ok(target) => target,
-        Err(_) => match interactive_target_prompt("check")? {
+        Err(_) => match interactive_target_prompt(locale)? {
             Some(target) => target,
             None => return Ok(()),
         },
@@ -444,7 +473,7 @@ fn interactive_check(locale: Locale) -> Result<(), String> {
 fn interactive_fix(locale: Locale) -> Result<(), String> {
     let config_path = match resolve_config_path(&[]) {
         Ok(path) => path,
-        Err(_) => match interactive_target_prompt("fix")? {
+        Err(_) => match interactive_target_prompt(locale)? {
             Some(CheckTarget::Config(path)) => path,
             Some(CheckTarget::Profile(path)) => path.join("openclaw.conf"),
             None => return Ok(()),
@@ -452,7 +481,7 @@ fn interactive_fix(locale: Locale) -> Result<(), String> {
     };
 
     let outcome = execute_fix(&config_path, None, true, locale, false)?;
-    println!("Fixed {}", outcome.display());
+    println!("{}", locale_text(locale).fixed_path(&outcome.display().to_string()));
     Ok(())
 }
 
@@ -460,7 +489,8 @@ fn interactive_remove(locale: Locale) -> Result<(), String> {
     let install_dir = match resolve_install_dir(&[]) {
         Ok(path) => path,
         Err(_) => match prompt_optional_input(
-            "Enter an install directory, or leave blank to cancel removal",
+            locale_text(locale).remove_install_dir_prompt,
+            locale,
         )? {
             Some(value) => PathBuf::from(value),
             None => return Ok(()),
@@ -470,10 +500,8 @@ fn interactive_remove(locale: Locale) -> Result<(), String> {
     execute_remove(&install_dir, locale, false)
 }
 
-fn interactive_sample_config() -> Result<(), String> {
-    let output = match prompt_optional_input(
-        "Enter a config path, or leave blank to create ./openclaw.conf",
-    )? {
+fn interactive_sample_config(locale: Locale) -> Result<(), String> {
+    let output = match prompt_optional_input(locale_text(locale).sample_config_prompt, locale)? {
         None => env::current_dir()
             .map_err(|error| format!("failed to resolve current directory: {error}"))?
             .join("openclaw.conf"),
@@ -482,12 +510,14 @@ fn interactive_sample_config() -> Result<(), String> {
 
     fs::write(&output, sample_config())
         .map_err(|error| format!("failed to write sample config {}: {error}", output.display()))?;
-    println!("sample config written to {}", output.display());
+    println!(
+        "{}",
+        locale_text(locale).sample_config_written(&output.display().to_string())
+    );
     Ok(())
 }
 
-fn run_uninstall(args: &[String]) -> Result<(), String> {
-    let locale = parse_locale(args)?;
+fn run_uninstall(args: &[String], locale: Locale) -> Result<(), String> {
     let text = locale_text(locale);
     let install_dir = optional_flag(args, "--install-dir")
         .map(PathBuf::from)
@@ -672,15 +702,16 @@ fn execute_remove(install_dir: &Path, locale: Locale, assume_yes: bool) -> Resul
     Ok(())
 }
 
-fn interactive_target_prompt(operation: &str) -> Result<Option<CheckTarget>, String> {
-    println!("No OpenClaw profile was auto-discovered for {operation}.");
+fn interactive_target_prompt(locale: Locale) -> Result<Option<CheckTarget>, String> {
+    let text = locale_text(locale);
+    println!("{}", text.auto_discovery_failed);
     if supports_rich_interaction() {
         let choice = dialoguer::Select::with_theme(&interactive_theme())
-            .with_prompt("How should ClawGuard continue?")
+            .with_prompt(text.continue_prompt)
             .items([
-                "📂 Enter a profile directory or config path",
-                "🧪 Create ./openclaw.conf from the sample template",
-                "↩ Back to the main menu",
+                text.target_option_path,
+                text.target_option_sample,
+                text.target_option_back,
             ])
             .default(0)
             .interact()
@@ -688,16 +719,14 @@ fn interactive_target_prompt(operation: &str) -> Result<Option<CheckTarget>, Str
 
         match choice {
             0 => {
-                let path = prompt_required_input("Enter a profile directory or config path")?;
+                let path = prompt_required_input(text.target_path_prompt, locale)?;
                 parse_interactive_target_path(&path).map(Some)
             }
-            1 => create_sample_target_here().map(Some),
+            1 => create_sample_target_here(locale).map(Some),
             _ => Ok(None),
         }
     } else {
-        let input = prompt_line(
-            "Enter a profile directory or config path, type 'sample' to create ./openclaw.conf, or press Enter to cancel",
-        )?;
+        let input = prompt_line(text.target_path_inline_prompt)?;
         let trimmed = input.trim();
 
         if trimmed.is_empty() {
@@ -705,7 +734,7 @@ fn interactive_target_prompt(operation: &str) -> Result<Option<CheckTarget>, Str
         }
 
         if trimmed.eq_ignore_ascii_case("sample") {
-            return create_sample_target_here().map(Some);
+            return create_sample_target_here(locale).map(Some);
         }
 
         parse_interactive_target_path(trimmed).map(Some)
@@ -916,7 +945,7 @@ fn prompt_line(prompt: &str) -> Result<String, String> {
     Ok(input)
 }
 
-fn prompt_optional_input(prompt: &str) -> Result<Option<String>, String> {
+fn prompt_optional_input(prompt: &str, _locale: Locale) -> Result<Option<String>, String> {
     if supports_rich_interaction() {
         let value = Input::<String>::with_theme(&interactive_theme())
             .with_prompt(prompt)
@@ -940,13 +969,13 @@ fn prompt_optional_input(prompt: &str) -> Result<Option<String>, String> {
     }
 }
 
-fn prompt_required_input(prompt: &str) -> Result<String, String> {
+fn prompt_required_input(prompt: &str, locale: Locale) -> Result<String, String> {
     if supports_rich_interaction() {
         Input::<String>::with_theme(&interactive_theme())
             .with_prompt(prompt)
             .validate_with(|value: &String| {
                 if value.trim().is_empty() {
-                    Err("Please enter a path.")
+                    Err(locale_text(locale).path_required)
                 } else {
                     Ok(())
                 }
@@ -981,7 +1010,7 @@ fn parse_interactive_target_path(input: &str) -> Result<CheckTarget, String> {
     }
 }
 
-fn create_sample_target_here() -> Result<CheckTarget, String> {
+fn create_sample_target_here(locale: Locale) -> Result<CheckTarget, String> {
     let config_path = env::current_dir()
         .map_err(|error| format!("failed to resolve current directory: {error}"))?
         .join("openclaw.conf");
@@ -991,12 +1020,30 @@ fn create_sample_target_here() -> Result<CheckTarget, String> {
             config_path.display()
         )
     })?;
-    println!("sample config written to {}", config_path.display());
+    println!(
+        "{}",
+        locale_text(locale).sample_config_written(&config_path.display().to_string())
+    );
     Ok(CheckTarget::Config(config_path))
 }
 
 fn interactive_theme() -> ColorfulTheme {
-    ColorfulTheme::default()
+    ColorfulTheme {
+        prompt_style: Style::new().for_stderr().bold().color256(208),
+        prompt_prefix: style("?".to_string()).for_stderr().color256(208),
+        prompt_suffix: style(">".to_string()).black().bright(),
+        success_prefix: style("OK".to_string()).for_stderr().color256(208),
+        success_suffix: style(">".to_string()).black().bright(),
+        error_prefix: style("ERR".to_string()).red(),
+        active_item_style: Style::new().for_stderr().bold().color256(208),
+        active_item_prefix: style(">".to_string()).for_stderr().color256(208),
+        inactive_item_prefix: style(" ".to_string()),
+        checked_item_prefix: style("[x]".to_string()).for_stderr().color256(208),
+        unchecked_item_prefix: style("[ ]".to_string()).magenta(),
+        picked_item_prefix: style(">".to_string()).for_stderr().color256(208),
+        unpicked_item_prefix: style(" ".to_string()),
+        ..Default::default()
+    }
 }
 
 fn supports_rich_interaction() -> bool {
@@ -1054,9 +1101,9 @@ fn print_usage(locale: Locale) {
     println!();
     println!("ClawGuard CLI");
     println!();
-    println!("Run `clawguard` without arguments to start interactive mode.");
+    println!("{}", text.usage_intro);
     println!();
-    println!("Commands:");
+    println!("{}", text.commands_label);
     println!("  interactive");
     println!("  check [--path <dir> | --config <path>] [--rules <path> | --rules-store <path>] [--format json|html|text] [--locale en|zh-CN] [--output <path>]");
     println!("  fix [--path <dir> | --config <path>] [--locale en|zh-CN] [--output <path> | --in-place] [--yes]");
@@ -1085,7 +1132,38 @@ fn parse_locale(args: &[String]) -> Result<Locale, String> {
 }
 
 struct CliLocaleText {
+    is_chinese: bool,
     tagline: &'static str,
+    interactive_mode_title: &'static str,
+    interactive_mode_plain_title: &'static str,
+    interactive_instructions: &'static str,
+    quick_actions: &'static str,
+    action_check: &'static str,
+    action_fix: &'static str,
+    action_remove: &'static str,
+    action_sample: &'static str,
+    action_exit: &'static str,
+    action_check_plain: &'static str,
+    action_fix_plain: &'static str,
+    action_remove_plain: &'static str,
+    action_sample_plain: &'static str,
+    action_exit_plain: &'static str,
+    no_action_selected_prompt: &'static str,
+    completed_selected_actions: &'static str,
+    choose_action_prompt: &'static str,
+    unknown_choice: &'static str,
+    auto_discovery_failed: &'static str,
+    continue_prompt: &'static str,
+    target_option_path: &'static str,
+    target_option_sample: &'static str,
+    target_option_back: &'static str,
+    target_path_prompt: &'static str,
+    target_path_inline_prompt: &'static str,
+    path_required: &'static str,
+    remove_install_dir_prompt: &'static str,
+    sample_config_prompt: &'static str,
+    usage_intro: &'static str,
+    commands_label: &'static str,
     hardening_completed: &'static str,
     before_score: &'static str,
     after_score: &'static str,
@@ -1097,10 +1175,75 @@ struct CliLocaleText {
     not_found_prefix: &'static str,
 }
 
+impl CliLocaleText {
+    fn report_written(&self, path: &str) -> String {
+        if self.is_chinese {
+            format!("报告已写入 {path}")
+        } else {
+            format!("report written to {path}")
+        }
+    }
+
+    fn sample_config_written(&self, path: &str) -> String {
+        if self.is_chinese {
+            format!("示例配置已写入 {path}")
+        } else {
+            format!("sample config written to {path}")
+        }
+    }
+
+    fn sample_rules_written(&self, path: &str) -> String {
+        if self.is_chinese {
+            format!("示例规则已写入 {path}")
+        } else {
+            format!("sample rules written to {path}")
+        }
+    }
+
+    fn fixed_path(&self, path: &str) -> String {
+        if self.is_chinese {
+            format!("已完成修复 {path}")
+        } else {
+            format!("Fixed {path}")
+        }
+    }
+}
+
 fn locale_text(locale: Locale) -> CliLocaleText {
     match locale {
         Locale::En => CliLocaleText {
+            is_chinese: false,
             tagline: "XiaoLongXia Guard | OpenClaw Security Audit and Hardening CLI",
+            interactive_mode_title: "== ClawGuard Interactive Mode ==",
+            interactive_mode_plain_title: "Interactive Mode",
+            interactive_instructions: "Use arrow keys to move, Space to toggle, and Enter to run.",
+            quick_actions: "Quick Actions",
+            action_check: "[Check] Check this machine",
+            action_fix: "[Fix] Fix local OpenClaw config",
+            action_remove: "[Remove] Remove installed ClawGuard binary",
+            action_sample: "[Sample] Generate sample config here",
+            action_exit: "[Exit] Exit interactive mode",
+            action_check_plain: "Check this machine",
+            action_fix_plain: "Fix local OpenClaw config",
+            action_remove_plain: "Remove installed ClawGuard binary",
+            action_sample_plain: "Generate sample config here",
+            action_exit_plain: "Exit",
+            no_action_selected_prompt: "No action selected. Exit ClawGuard?",
+            completed_selected_actions: "Completed selected action(s).",
+            choose_action_prompt: "Choose an action",
+            unknown_choice: "Unknown choice. Enter 1, 2, 3, 4, or 5.",
+            auto_discovery_failed: "No OpenClaw profile was auto-discovered.",
+            continue_prompt: "How should ClawGuard continue?",
+            target_option_path: "[Path] Enter a profile directory or config path",
+            target_option_sample: "[Sample] Create ./openclaw.conf from the sample template",
+            target_option_back: "[Back] Return to the main menu",
+            target_path_prompt: "Enter a profile directory or config path",
+            target_path_inline_prompt: "Enter a profile directory or config path, type 'sample' to create ./openclaw.conf, or press Enter to cancel",
+            path_required: "Please enter a path.",
+            remove_install_dir_prompt: "Enter an install directory, or leave blank to cancel removal",
+            sample_config_prompt: "Enter a config path, or leave blank to create ./openclaw.conf",
+            usage_intro: "Run `clawguard` without arguments to start interactive mode.",
+            commands_label: "Commands:",
             hardening_completed: "hardening completed",
             before_score: "before_score",
             after_score: "after_score",
@@ -1112,7 +1255,38 @@ fn locale_text(locale: Locale) -> CliLocaleText {
             not_found_prefix: "binary not found at",
         },
         Locale::ZhCn => CliLocaleText {
+            is_chinese: true,
             tagline: "小龙虾卫士 | OpenClaw 安全审计与加固 CLI",
+            interactive_mode_title: "== ClawGuard 交互模式 ==",
+            interactive_mode_plain_title: "交互模式",
+            interactive_instructions: "使用方向键移动，空格选择，回车执行。",
+            quick_actions: "快速操作",
+            action_check: "[检查] 扫描本机",
+            action_fix: "[修复] 加固本地 OpenClaw 配置",
+            action_remove: "[卸载] 移除已安装的 ClawGuard 二进制",
+            action_sample: "[示例] 在当前目录生成示例配置",
+            action_exit: "[退出] 退出交互模式",
+            action_check_plain: "扫描本机",
+            action_fix_plain: "加固本地 OpenClaw 配置",
+            action_remove_plain: "移除已安装的 ClawGuard 二进制",
+            action_sample_plain: "在当前目录生成示例配置",
+            action_exit_plain: "退出",
+            no_action_selected_prompt: "未选择任何操作。要退出 ClawGuard 吗？",
+            completed_selected_actions: "已完成所选操作。",
+            choose_action_prompt: "请选择操作",
+            unknown_choice: "无效选项。请输入 1、2、3、4 或 5。",
+            auto_discovery_failed: "未能自动发现 OpenClaw profile。",
+            continue_prompt: "ClawGuard 应如何继续？",
+            target_option_path: "[路径] 输入 profile 目录或配置文件路径",
+            target_option_sample: "[示例] 从模板创建 ./openclaw.conf",
+            target_option_back: "[返回] 返回主菜单",
+            target_path_prompt: "请输入 profile 目录或配置文件路径",
+            target_path_inline_prompt: "请输入 profile 目录或配置文件路径，输入 'sample' 可创建 ./openclaw.conf，直接回车可取消",
+            path_required: "请输入路径。",
+            remove_install_dir_prompt: "请输入安装目录，或直接回车取消卸载",
+            sample_config_prompt: "请输入配置文件路径，或直接回车创建 ./openclaw.conf",
+            usage_intro: "直接运行 `clawguard` 可进入交互模式。",
+            commands_label: "命令：",
             hardening_completed: "加固完成",
             before_score: "加固前评分",
             after_score: "加固后评分",

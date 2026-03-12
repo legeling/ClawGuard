@@ -67,14 +67,14 @@ ClawGuard exists to turn that into a practical operator workflow:
 
 ## What It Does
 
-### 🔎 Audit
+### Audit
 
 - Scan a single OpenClaw config file
 - Scan a deployment directory
 - Detect exposure, auth, permission, secrets, and supply-chain findings
 - Load custom rulesets
 
-### 🛠 Harden
+### Harden
 
 - Back up configs before changes
 - Restrict risky bind addresses
@@ -82,7 +82,7 @@ ClawGuard exists to turn that into a practical operator workflow:
 - Disable dangerous debug and status exposure
 - Remove suspicious skills from the active config path
 
-### 🧾 Report
+### Report
 
 - Export `json`, `html`, and `text`
 - Use English or Simplified Chinese output
@@ -136,7 +136,8 @@ cargo run -p clawguard --
 
 In a real terminal, ClawGuard now opens a richer TUI:
 
-- emoji-backed action labels
+- ASCII-only action labels and prompt markers
+- orange-accent terminal theme with stable alignment
 - arrow-key navigation
 - space-to-toggle quick actions
 - enter-to-run
@@ -151,6 +152,12 @@ cargo run -p clawguard -- check
 `check` now prints the discovered `profile_path` and a `local_probe` result before the report body.
 
 With no arguments, ClawGuard starts an interactive menu for check, fix, remove, and sample-config flows.
+
+Start interactive mode in Simplified Chinese:
+
+```bash
+cargo run -p clawguard -- --locale zh-CN
+```
 
 Auto-discover a local config and harden it in place:
 
@@ -199,6 +206,8 @@ Scan with localized text output:
 ```bash
 cargo run -p clawguard -- scan --config example.conf --format text --locale zh-CN
 ```
+
+ClawGuard also localizes the help screen and interactive prompts when `--locale zh-CN` is supplied or when the environment resolves to Chinese.
 
 Scan a deployment directory:
 
@@ -350,6 +359,15 @@ Yes.
 
 If `--locale` is not provided, ClawGuard checks `LC_ALL`, `LC_MESSAGES`, and `LANG`.
 If the environment looks Chinese, it switches to `zh-CN`. Otherwise it defaults to English.
+
+The same locale selection applies to:
+
+- the help screen
+- the interactive menu
+- interactive prompts and confirmations
+- terminal report output
+
+If colors do not appear in your terminal, check whether `NO_COLOR=1` is set in your shell environment.
 
 ### Does ClawGuard have an uninstall flow?
 

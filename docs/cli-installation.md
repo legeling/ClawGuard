@@ -48,12 +48,21 @@ This starts an interactive terminal UI so users can choose check, fix, remove, o
 
 Interactive behavior in a real TTY:
 
+- ASCII-only labels avoid terminal-width alignment issues
+- orange-accent prompt styling improves focus without relying on emoji
 - arrow keys move through the menu
 - space toggles quick actions
 - enter runs the selected actions
 - confirmations and path prompts use interactive widgets
 
 If ClawGuard is run in a non-interactive shell, it falls back to plain text prompts.
+
+To force Simplified Chinese in the help screen and interactive UI:
+
+```bash
+clawguard --locale zh-CN
+clawguard --locale zh-CN --help
+```
 
 ## 3. Install Into Cargo Bin
 
@@ -227,6 +236,15 @@ Automatic locale detection:
 - If `--locale` is omitted, ClawGuard checks `LC_ALL`, `LC_MESSAGES`, and `LANG`
 - Chinese environments default to `zh-CN`
 - Other environments default to English
+
+Locale switching applies to:
+
+- report output
+- the help screen
+- default interactive mode
+- interactive prompts and confirmations
+
+If terminal colors are missing, check whether `NO_COLOR=1` is set.
 
 ## 10. Remaining Packaging Gaps
 

@@ -232,7 +232,8 @@ The system must support:
 
 - English as the default command and report language
 - Simplified Chinese as an optional report locale
-- Locale-aware report rendering
+- Locale-aware help, interactive prompts, and report rendering
+- Explicit locale selection through CLI flags and environment-based auto-detection
 
 The project must also enforce:
 
